@@ -1,0 +1,15 @@
+---
+title: "INTRODUCTION TO SPATILA STATISTICS IN R"
+format: html
+editor: visual
+code-overflow: wrap
+df-print: kable
+execute: 
+  echo: true
+  warning: false
+  message: false
+editor_options: 
+  chunk_output_type: console
+---
+
+## 

@@ -1,0 +1,698 @@
+---
+title: "INTRODUCTION TO SPATIAL STATISTICS IN R"
+format: html
+editor: visual
+code-overflow: wrap
+df-print: kable
+execute: 
+  echo: true
+  warning: false
+  message: false
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(tidyverse)
+library(broom)
+library(janitor)
+library(gt)
+library(gtsummary)
+theme_set(theme_bw())
+```
+
+```{r}
+library(sf)
+library(terra)
+```
+
+```{r}
+philly_sf <- read_rds("philadelphia_tracts.rds")
+```
+
+```{r}
+st_crs(philly_sf)
+st_crs(philly_sf) <- sf::st_crs(4326)
+
+
+```
+
+### Polygon Data
+
+```{r}
+pt_sf <- philly_sf
+class(pt_sf)
+glimpse(philly_sf)
+dim(philly_sf)
+head(philly_sf)
+```
+
+```{r}
+## extract just spatial attributes
+st_geometry(philly_sf)
+```
+
+```{r}
+philly_geo <- st_geometry(philly_sf)
+
+```
+
+```{r}
+philly_geo[[1]]
+```
+
+```{r}
+ggplot(philly_sf) +
+  geom_sf(fill = "lightblue", color = "white") +
+  theme_minimal() +
+  labs(title = "Philadelphia Census Tracts")
+
+```
+
+### Line Data
+
+```{r}
+bike_lanes <- st_read("Bike_Network.shp")
+```
+
+```{r}
+ggplot(bike_lanes) +
+  geom_sf(color = "steelblue", size = 0.3) +
+  theme_minimal() +
+  labs(title = "Philadelphia Bike Network")
+
+```
+
+```{r}
+ggplot() +
+  geom_sf(data = philly_sf, fill = "gray95", color = "white") +
+  geom_sf(data = bike_lanes, color = "steelblue", size = 0.3) +
+  theme_minimal() +
+  labs(title = "Bike Lanes Overlaid on Philadelphia Census Tracts")
+
+```
+
+```{r}
+st_geometry(bike_lanes)
+```
+
+### Points Data
+
+```{r}
+philly_crimes <- read_csv("philly_crimes.csv")
+class(philly_crimes)
+
+
+philly_crimes <- philly_crimes %>%
+  filter(!is.na(lat), !is.na(lng)) %>%
+  filter(lat > 38 & lat < 41,    # Philadelphia bounding box
+         lng < -70 & lng > -76)  # longitude should be west of 0
+
+```
+
+```{r}
+crimes2 <-read_csv("crime2.csv")
+class(crimes2)
+
+crimes <-  st_as_sf(crimes2,
+                    coords = c("Lon","Lat"),
+                    crs = 4326)
+```
+
+```{r}
+library(sf)
+
+# Convert to sf object
+philly_crimes_sf <- st_as_sf(philly_crimes, 
+                              coords = c("lng","lat"),  
+                              crs = 4326)  # WGS 84
+
+```
+
+```{r}
+st_geometry_type(philly_crimes_sf)
+st_crs(philly_crimes_sf)
+```
+
+```{r}
+class(crimes)
+```
+
+```{r}
+ggplot() +
+  geom_sf(data = philly_sf, fill = "gray95", color = "white") +
+  geom_sf(data = philly_crimes_sf, color = "red", alpha = 0.4, size = 0.5) +
+  theme_minimal() +
+  labs(title = "Philadelphia Crime Locations")
+
+```
+
+```{r}
+st_geometry_type(philly_crimes_sf)
+st_crs(philly_crimes_sf)
+plot(st_geometry(philly_crimes_sf))  # base R check
+
+```
+
+### Aggregate Crime Counts by Tract
+
+```{r}
+#For each crime point, find the census tract polygon it falls within, and append the tract attributes to the crime.
+
+joined <- st_join(philly_crimes_sf, philly_sf)  # assigns each point to a tract
+
+
+
+crime_counts <- joined %>%
+  group_by(GEOID10) %>%  # or appropriate tract ID
+  summarise(n = n())
+
+
+philly_sf <- left_join(
+  philly_sf,
+  st_drop_geometry(crime_counts),
+  by = "GEOID10" 
+)
+
+
+ggplot(philly_sf) +
+  geom_sf(aes(fill = n)) +
+  scale_fill_viridis_c(na.value = "white") +
+  theme_minimal() +
+  labs(title = "Crime Counts per Census Tract")
+
+```
+
+### Time-Series or Temporal Filtering
+
+```{r}
+
+recent_crimes <- philly_crimes_sf %>%
+  filter(dispatch_date > as.Date("2025-07-01"))
+
+ggplot() +
+  geom_sf(data = philly_sf, fill = "gray90") +
+  geom_sf(data = recent_crimes, color = "blue", alpha = 0.5, size = 0.3) +
+  labs(title = "Crimes Since July 2025")+
+  theme_bw()
+
+```
+
+```{r}
+ggplot() +
+  geom_sf(data = philly_sf, fill = "gray90", color = NA) +
+  stat_density_2d(
+    data = st_coordinates(philly_crimes_sf) %>% as.data.frame(),
+    aes(x = X, y = Y, fill = after_stat(level)), 
+    geom = "polygon", alpha = 0.4
+  ) +
+  scale_fill_viridis_c() +
+  labs(title = "Crime Density Heatmap") +
+  theme_minimal()+ 
+  theme(axis.title = element_blank())
+
+
+```
+
+```{r}
+philly_crimes_sf |> 
+  distinct(text_general_code) |> 
+  print(n = Inf)
+```
+
+```{r}
+homicide <- philly_crimes_sf |> 
+  filter(text_general_code == "Homicide - Criminal")
+
+fraud <- philly_crimes_sf |> 
+  filter(text_general_code == "Fraud")
+```
+
+```{r}
+ 
+  ggplot()+
+     geom_sf(data = philly_sf, fill = "gray95", color = "white")+
+  geom_sf(data = homicide, color = "red")+
+    geom_sf(data = fraud, color = "blue")+
+    theme_minimal()
+   
+```
+
+### Rasta Dataset
+
+```{r}
+library(datasets)
+class(volcano)
+volcano <- volcano
+```
+
+```{r}
+library(raster)
+
+volcano_raster <- raster(volcano)
+plot(volcano_raster, main = "Volcano Raster (raster pkg)")
+
+```
+
+```{r}
+library(terra)
+
+volcano_terra <- rast(volcano)
+plot(volcano_terra, main = "Volcano Raster (terra pkg)")
+
+```
+
+```{r}
+library(raster)
+library(ggplot2)
+
+# 1. Convert matrix to raster
+volcano_raster <- raster(volcano)
+
+# 2. Convert to data frame
+volcano_df <- as.data.frame(volcano_raster, xy = TRUE)
+names(volcano_df)[3] <- "elevation"  # Rename layer column
+
+# 3. Plot with ggplot2
+ggplot(volcano_df, aes(x = x, y = y, fill = elevation)) +
+  geom_raster() +
+  scale_fill_viridis_c() +
+  coord_equal() +
+  theme_minimal() +
+  labs(title = "Volcano Elevation Map", fill = "Elevation")
+
+```
+
+```{r}
+library(terra)
+volcano_rast <- rast(volcano)
+volcano_df <- as.data.frame(volcano_rast, xy = TRUE)
+names(volcano_df)[3] <- "elevation"
+
+ggplot(volcano_df, aes(x = x, y = y, fill = elevation)) +
+  geom_raster() +
+  scale_fill_viridis_c() +
+  coord_equal() +
+  theme_minimal()+
+  labs(title = "Volcano Elevation Map", fill = "Elevation")
+
+
+```
+
+```{r}
+library(ggplot2)
+
+# Convert volcano matrix to data frame
+volcano_df <- as.data.frame(as.table(volcano))
+names(volcano_df) <- c("y", "x", "elevation")
+
+# Create plot with raster and contour lines
+ggplot(volcano_df, aes(x = x, y = y, z = elevation)) +
+  geom_raster(aes(fill = elevation)) +
+  geom_contour(color = "black", size = 0.3) +
+  scale_fill_viridis_c(name = "Elevation") +
+  labs(title = "Volcano Elevation Map with Contours") +
+  theme_minimal()
+
+```
+
+### Spatial Hypothesis Testing
+
+```{r}
+
+nyc <- st_read("Counties.shp")
+nys_lyme_data <- read_rds("nys_lyme_data.rds")
+lyme <- nys_lyme_data
+```
+
+```{r}
+class(nys_lyme_data)
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = nyc,color = "black",fill = "gray95")+
+  theme_minimal()+
+  labs(title = 'New York City Counties')
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = nys_lyme_data,color = "steelblue",fill = "gray95")+
+  theme_minimal()+
+  labs(title = 'New York State Lyme Disease Data')
+```
+
+```{r}
+st_geometry((nys_lyme_data))
+
+```
+
+```{r}
+library(tmap)
+tmap_mode("view") # set mode to interactive
+  tm_shape(nys_lyme_data)+ # specify sf object with geographic attribute of interest
+    tm_polygons("Lyme.Incidence.Rate") # specify column with value of interest
+```
+
+```{r}
+# St lawrence has missing values for ithe incidence rate so you remove it
+nys_lyme_data <- nys_lyme_data |> 
+  filter(!is.na(Lyme.Incidence.Rate))
+```
+
+```{r}
+tmap_mode("view")
+tm_shape(nys_lyme_data)+
+  tm_polygons("Lyme.Incidence.Rate")
+```
+
+### Global Clustering (Moran's I)
+
+```{r}
+summary(nys_lyme_data[["Lyme.Incidence.Rate"]])
+```
+
+```{r}
+nys_lyme_data |> 
+  ggplot(aes(x = Lyme.Incidence.Rate))+
+  geom_histogram(color = "white")
+
+nys_lyme_data |> 
+  ggplot(aes(x = Lyme.Incidence.Rate))+
+  geom_boxplot()
+```
+
+```{r}
+nys_lyme_data <-  nys_lyme_data |> 
+  mutate(log_lyme_incidence = log(Lyme.Incidence.Rate))
+```
+
+```{r}
+nys_lyme_data |> 
+  ggplot(aes(x = log_lyme_incidence))+
+  geom_histogram(color = "white",bins = 20)
+
+nys_lyme_data |> 
+  ggplot(aes(x = log_lyme_incidence))+
+  geom_boxplot()
+```
+
+```{r}
+tmap_mode("view")
+tm_shape(nys_lyme_data)+
+  tm_polygons("log_lyme_incidence")
+```
+
+#### Define Neighbouring Polygons
+
+```{r}
+library(spdep)
+
+## create nb object from lyme dataset
+lyme_nb <- poly2nb(nys_lyme_data,queen = TRUE) # queen case
+# poly2nb is for finding contiguinity neighbors
+```
+
+```{r}
+class(lyme_nb)
+str(lyme_nb)
+```
+
+```{r}
+# view neighbors of first polygon
+lyme_nb[[1]]
+nys_lyme_data[["NAME"]][1]
+nys_lyme_data[["NAME"]][c(11,20,42,45,46,47)]
+
+```
+
+#### Assigning Weights to neighbors
+
+```{r}
+## calculate weights from nb object, we will specify style = "W" for equal weights
+lyme_weights <- nb2listw(lyme_nb, style = "W")
+
+class(lyme_weights)
+```
+
+```{r}
+str(lyme_weights, max.level = 1)
+```
+
+```{r}
+## The weights of the neighbors for the first polygon (Albany)
+## Albany has 6 neighbors
+
+lyme_weights[["weights"]][1]
+
+```
+
+```{r}
+lyme[["NAME"]][2]
+lyme_nb[[2]]
+lyme_weights[["weights"]][2]
+```
+
+#### Perform Hypothesis Testing
+
+```{r}
+## calculate Moran's I statistic and perform hypothesis testing using "moran.test" (analytical calculation) and "moran.mc" (via montecarlo simulation)
+
+## These functions require that we specify the variable of interest and the list of neighbor weights for each polygon
+
+## The option alternative = "greater" specifies testing foe positive spatial autocorrelation , which is alo the default for these functions
+
+## The "moran.mc" function also requires that we specify the number of simulations with option "nsim"
+```
+
+```{r}
+## Analytical test - quicker computation but sensitive to irregularly distributed polygons
+
+moran.test(nys_lyme_data[["log_lyme_incidence"]],lyme_weights,alternative = "greater")
+
+
+moran.test(nys_lyme_data[["log_lyme_incidence"]],lyme_weights,alternative = "greater") |> 
+  tidy()
+```
+
+```{r}
+## Monte carlo simulation is slower but the preferred method for an accurate p-value
+
+MC <- moran.mc(nys_lyme_data[["log_lyme_incidence"]],lyme_weights,nsim = 999,alternative = "greater")
+
+MC
+```
+
+```{r}
+log_incidence_rates <- nys_lyme_data |> pull(log_lyme_incidence)
+
+mc_result <- moran.mc(log_incidence_rates,lyme_weights,nsim = 999,alternative = "greater")
+
+mc_result
+```
+
+```{r}
+names(mc_result)
+```
+
+```{r}
+library(ggplot2)
+
+# Convert to data frame for ggplot
+mc_df <- data.frame(simulated_I = mc_result$res)
+
+
+ggplot(mc_df, aes(x = simulated_I)) +
+  geom_histogram(fill = "gray80", color = "white", bins = 30) +
+  geom_vline(xintercept = mc_result$statistic, color = "red", size = 1.2) +
+  labs(title = "Monte Carlo Simulation of Moran's I",
+       x = "Simulated Moran's I",
+       y = "Frequency",
+       subtitle = paste("Observed Moran's I =", round(mc_result$statistic, 4))) +
+  theme_minimal()
+
+
+
+
+ggplot(mc_df, aes(x = simulated_I)) +
+  geom_density(fill = "gray80", color = "white") +
+  geom_vline(xintercept = mc_result$statistic, color = "red", size = 1.2) +
+  labs(title = "Monte Carlo Simulation of Moran's I",
+       x = "Simulated Moran's I",
+       y = "Frequency",
+       subtitle = paste("Observed Moran's I =", round(mc_result$statistic, 4))) +
+  theme_minimal()
+
+```
+
+### Assessing Local Trends
+
+```{r}
+library(rgeoda)
+library(spdep)
+
+## find queen_case contiguous weights
+lyme_gweights <- queen_weights(nys_lyme_data)
+class(lyme_gweights)
+
+str(lyme_gweights)
+```
+
+```{r}
+## see the neighbors of the first polygon (Albany)
+get_neighbors(lyme_gweights,1)
+nys_lyme_data[["NAME"]][1]
+nys_lyme_data[["NAME"]][get_neighbors(lyme_gweights,1)]
+
+```
+
+```{r}
+## get neighbor weights of first and second polygons
+get_neighbors_weights(lyme_gweights,1)
+get_neighbors_weights(lyme_gweights,2)
+```
+
+#### Calculate Local Moran I statistic
+
+```{r}
+## local_moran function requires a one-column data frame
+log_incidence_df <- as.data.frame(nys_lyme_data[["log_lyme_incidence"]])
+
+lyme_lisa <- local_moran(lyme_gweights,log_incidence_df)
+
+## local_moran returns a LISA object
+class(lyme_lisa)
+```
+
+```{r}
+## There will be a Moran's I statistic and associated pseudo p_value at each polygon
+names(lyme_lisa)
+
+lyme_lisa[["lisa_vals"]] ## View local Moran's I values for each polygon
+lyme_lisa[["p_vals"]]  ## View pseudo p-values
+
+
+```
+
+```{r}
+map_colors <- lisa_colors(lyme_lisa)
+map_labels <- lisa_labels(lyme_lisa)
+map_clusters <- lisa_clusters(lyme_lisa)
+```
+
+```{r}
+# Extract cluster IDs from the LISA result
+cluster_id <- lisa_clusters(lyme_lisa)
+
+# Use only the labels and colors for the present cluster IDs (0, 1, 2)
+labels_all <- lisa_labels(lyme_lisa)
+colors_all <- lisa_colors(lyme_lisa)
+
+nys_lyme_data$cluster_label <- labels_all[as.integer(cluster_id) + 1]
+nys_lyme_data$cluster_color <- colors_all[as.integer(cluster_id) + 1]
+
+```
+
+```{r}
+table(nys_lyme_data$cluster_label)
+table(nys_lyme_data$cluster_color)
+```
+
+```{r}
+ggplot(nys_lyme_data) +
+  geom_sf(aes(fill = cluster_label), color = "white", size = 0.1) +
+  scale_fill_manual(
+    values = setNames(nys_lyme_data$cluster_color, nys_lyme_data$cluster_label),
+    name = "LISA Cluster"
+  ) +
+  labs(title = "Local Moran's I Cluster Map (Lyme Disease in NYS)") +
+  theme_minimal()
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(nys_lyme_data) +
+  geom_sf(aes(fill = cluster_label), color = "white", size = 0.2) +
+  scale_fill_manual(
+    values = setNames(unique(nys_lyme_data$cluster_color), unique(nys_lyme_data$cluster_label)),
+    name = "LISA Cluster"
+  ) +
+  theme_minimal() +
+  labs(title = "Local Moran's I Cluster Map of Lyme Disease in NY State")
+
+```
+
+```{r}
+library(tmap)
+
+# Ensure your spatial data is in sf format and has cluster_color and cluster_label
+nys_lyme_data$cluster_label <- factor(nys_lyme_data$cluster_label)
+
+# Set tmap to interactive mode
+tmap_mode("view")
+
+# Create interactive map
+tm_shape(nys_lyme_data) +
+  tm_polygons(
+    col = "cluster_label",
+    palette = c("High-High" = "#FF0000", "Low-Low" = "#0000FF", "Not significant" = "#eeeeee"),
+    title = "LISA Cluster",
+    id = "NAME",           # tooltip: county name
+    popup.vars = c("Cluster" = "cluster_label", "Cases" = "log_lyme_incidence")
+  ) +
+  tm_layout(title = "Local Moran's I Lyme Clusters (NY)", legend.outside = TRUE)
+
+```
+
+```{r}
+library(sf)
+
+# Reproject to WGS84 (EPSG:4326)
+nys_lyme_data_wgs84 <- st_transform(nys_lyme_data, crs = 4326)
+
+```
+
+```{r}
+leaflet(nys_lyme_data_wgs84) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addPolygons(
+    fillColor = ~pal(cluster_label),
+    fillOpacity = 0.7,
+    weight = 1,
+    color = "#555",
+    label = ~paste(NAME, "<br>", cluster_label),
+    highlightOptions = highlightOptions(
+      weight = 2,
+      color = "#000",
+      bringToFront = TRUE
+    )
+  ) %>%
+  addLegend("bottomright", pal = pal, values = ~cluster_label,
+            title = "LISA Cluster")
+
+
+```
+
+```{r}
+library(leaflet)
+
+leaflet() %>%
+  addTiles() %>%  # Adds OpenStreetMap tile
+  addMarkers(lng = -74.006, lat = 40.7128, popup = "New York City")
+
+```
+
+```{r}
+map_colors <- lisa_colors(lyme_lisa)
+map_labels <- lisa_labels(lyme_lisa)
+map_clusters <- lisa_clusters(lyme_lisa)
+```
+
+```{r}
+lisa_clusters(lyme_lisa)
+# High-High = 1
+# Low-Low = 2
+# Not significant = 0
+```

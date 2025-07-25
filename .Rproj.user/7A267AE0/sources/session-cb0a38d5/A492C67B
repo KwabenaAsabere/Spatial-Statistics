@@ -1,0 +1,33 @@
+{
+    "id": "A492C67B",
+    "path": "~/Desktop/SPATIAL STATISTICS/spatial_statistics_2.qmd",
+    "project_path": "spatial_statistics_2.qmd",
+    "type": "quarto_markdown",
+    "hash": "1056585516",
+    "contents": "",
+    "dirty": true,
+    "created": 1753416673052.0,
+    "source_on_save": false,
+    "relative_order": 10,
+    "properties": {
+        "rmdVisualMode": "true",
+        "rmdVisualWrapConfigured": "true",
+        "tempName": "Untitled1",
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "141,0",
+        "scrollLine": "0",
+        "docOutlineVisible": "0",
+        "rmdVisualCollapsedChunks": "",
+        "rmdVisualModeLocation": "2603:2000",
+        "chunk_output_type": "console"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1753416762,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1753486490680,
+    "read_only": false,
+    "read_only_alternatives": []
+}
