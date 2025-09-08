@@ -1,5 +1,5 @@
 ---
-title: "INTRODUCTION TO SPATILA STATISTICS IN R"
+title: "INTRODUCTION TO SPATIAL STATISTICS IN R"
 format: html
 editor: visual
 code-overflow: wrap
@@ -12,4 +12,340 @@ editor_options:
   chunk_output_type: console
 ---
 
-## 
+```{r}
+library(tidyverse)
+library(broom)
+library(janitor)
+library(gt)
+library(gtsummary)
+theme_set(theme_bw())
+```
+
+```{r}
+library(sf)
+library(terra)
+library(spdep)
+library(rgeoda)
+library(tmap)
+library(leaflet)
+library(gstat)
+library(sp)
+library(stars)
+```
+
+```{r}
+# set range parameter
+range = 2
+
+## make a plot of the exponential correlation
+tt = seq(0,10,length.out = 300)
+
+cov_fun = exp(-tt/range)
+
+ggplot()+
+  geom_line(aes(x = tt,y = cov_fun),linewidth = 1)+
+  labs(x = "distance", y= "correlation")
+```
+
+```{r}
+## same plot, but as a variogram
+nugget <- 0.2
+
+ggplot()+
+geom_line(aes(x = tt,y = (1-cov_fun + nugget)),linewidth = 1)+
+  labs(x = "distance", y= "semivariance")+
+  ylim(c(0,1.2))
+```
+
+```{r}
+## simulate six realizations with an exponential model
+
+# define covariance model
+grid = expand.grid(
+  x = seq(0,10,length.out = 100),
+  y = seq(0,10,length.out = 100)
+)
+
+coordinates(grid) <- ~ x+ y
+
+## def exponential variogram model
+vmod <- vgm(psill = 1, model = "Exp", range = 1, nugget = 0)
+
+## simulate 4 realizations
+sim <- gstat(formula = z ~ 1, locations = ~x+ y,dummy = TRUE,beta = 0,model = vmod, nmax = 20)
+
+set.seed(123)
+z <- predict(sim,newdata = grid, nsim =4)
+
+## plot one realization
+# Plot one realization
+sp::spplot(z["sim1"], main = "Simulated Field (sim1)")
+```
+
+```{r}
+# Convert to data frame
+df_sim <- as.data.frame(z)
+
+# Check column names
+head(df_sim)
+```
+
+```{r}
+ggplot(df_sim, aes(x = x, y = y, fill = sim1)) +
+  geom_raster() +
+  scale_fill_viridis_c(option = "magma") +  # or "plasma", "viridis", etc.
+  coord_equal() +
+  labs(title = "Simulated Spatial Field (sim1)",
+       fill = "Value") +
+  theme_minimal()
+
+```
+
+```{r}
+library(tidyr)
+df_long <- pivot_longer(df_sim, cols = starts_with("sim"),
+                        names_to = "realization", values_to = "value")
+
+ggplot(df_long, aes(x = x, y = y, fill = value)) +
+  geom_raster() +
+  facet_wrap(~realization) +
+  scale_fill_viridis_c() +
+  coord_equal() +
+  theme_minimal()
+
+```
+
+```{r}
+library(ggplot2)
+library(gstat)
+library(sp)
+
+# Convert df_sim to SpatialPointsDataFrame
+coordinates(df_sim) <- ~x + y
+
+# Compute empirical variogram
+variogram_result <- variogram(sim1 ~ 1, data = df_sim)
+
+# Plot using ggplot2
+ggplot(variogram_result, aes(x = dist, y = gamma)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Distance", y = "Semivariance γ(h)",
+       title = "Empirical Variogram (sim1)") +
+  theme_minimal()
+
+
+```
+
+### Geostatistics
+
+```{r}
+rongelap_data <- read_csv("rongelap.csv")
+rongelap_sf <- st_read("rongelap.shp")
+load("rongelap-outline.RDATA")
+```
+
+```{r}
+## convert data to sf
+rongelap <- st_as_sf(rongelap_data, coords = c("x","y"))
+```
+
+```{r}
+## outline of island
+ggplot()+
+  geom_sf(data = rongelap_shp)
+
+## histogram of readings
+rongelap |> 
+ggplot()+
+  geom_histogram(aes(x = val),color = "white")
+```
+
+```{r}
+rongelap <-  rongelap |> 
+  mutate(log_vals = log(val))
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = rongelap_shp, fill = NA)+
+  geom_sf(data = rongelap,aes(color= log_vals))+
+  scale_color_viridis_c(option = "inferno")+
+  labs(fill = "Log Values")
+```
+
+### Kriging
+
+```{r}
+## split and hold out a portion of the dataset
+library(tidymodels)
+dim(rongelap)
+
+rsplit <- initial_split(rongelap,prop = 0.8,strata = val)
+r2 <-  training(rsplit)
+r3 <- testing(rsplit)
+```
+
+```{r}
+## make a kriging model
+## model with only an intercept ( ~1 )
+
+rongelap_fit <- krige(log(val) ~ 1,
+                      locations = r2,
+                      newdata = r3,
+                      model = vgm(psill = 0.5, model = "Exp", 
+                                  range = 500, nugget = 0.5)
+                      )
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = rongelap_shp,fill = NA)+
+  geom_sf(data = rongelap_fit,aes(color = var1.pred))+
+  scale_color_viridis_c(option = "inferno")+
+  labs(fill = "Log Values")
+```
+
+```{r}
+
+ggplot()+
+  geom_sf(data = rongelap_shp,fill = NA)+
+  geom_sf(data = rongelap_fit,aes(color = var1.pred))+
+  scale_color_gradient2(midpoint = 7.5,limits = c(4,10), low = "blue",high = "red")+
+labs(fill = "Log Values")
+```
+
+```{r}
+## compare fitted to actual
+
+names(rongelap_fit)
+rongelap_fit$geometry
+```
+
+```{r}
+ggplot()+
+  geom_point(aes(x = rongelap_fit[["var1.pred"]], y= r3[["log_vals"]]))+
+ geom_abline(slope = 1, intercept = 0)
+  
+
+```
+
+```{r}
+ggplot() +
+  geom_point(aes(x = rongelap_fit[["var1.pred"]], y = r3[["log_vals"]])) +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") +
+  coord_fixed() +
+  xlim(5, 10) +
+  ylim(5, 10) +
+  labs(x = "Predicted log(val)", y = "Observed log(val)") +
+  theme_minimal()
+
+
+
+```
+
+### Meuse Data
+
+```{r}
+## load the meuse data
+
+meuse <- read_csv("meuse.csv")
+meause_grid <- read_csv("meuse.grid.csv")
+
+## convert to sf type
+meuse <- st_as_sf(meuse,coords = c("x","y"))
+meuse_grid <- st_as_sf(meause_grid,coords = c("x","y"))
+
+meuse <- meuse |> 
+  mutate(log_zinc = log(zinc))
+```
+
+```{r}
+meuse |> 
+  ggplot(aes(x = zinc))+
+  geom_histogram(color = "white")
+
+meuse |> 
+  ggplot(aes(x = log(zinc)))+
+  geom_histogram(color = "white")
+```
+
+```{r}
+## bubble plot of Meuse River zinc data
+
+meuse |> 
+  ggplot()+
+  geom_sf(aes(size = zinc),color = "steelblue",alpha = 0.6)
+```
+
+```{r}
+## make a variogra,m of the meuse data
+vario <-  variogram(log(zinc) ~ sqrt(dist), data = meuse)
+vario_fit <- fit.variogram(vario, model =vgm(psill = 1, model = "Exp", 
+                                  range = 900, nugget = 1))
+```
+
+```{r}
+## show fitted variogram and it's parameters
+vario_fit
+```
+
+```{r}
+plot(vario,vario_fit)
+```
+
+```{r}
+library(ggplot2)
+library(gstat)
+
+# 1. Compute fitted curve values from the model
+fitted_line <- variogramLine(vario_fit, maxdist = max(vario$dist), n = 100)
+
+# 2. ggplot
+ggplot() +
+  geom_point(data = vario, aes(x = dist, y = gamma), size = 2) +
+  geom_line(data = fitted_line, aes(x = dist, y = gamma), color = "red", linewidth = 1) +
+  labs(
+    x = "Distance (h)",
+    y = "Semivariance γ(h)",
+    title = "Empirical and Fitted Variogram"
+  ) +
+  theme_minimal()
+
+```
+
+```{r}
+## regression kriging for the log concentration
+
+meuse_fit <- krige(log(zinc) ~ sqrt(dist),
+                   locations = meuse,
+                   newdata = meuse_grid,
+                   model = vario_fit
+                   )
+
+
+ggplot()+
+  geom_sf(data = meuse_fit,aes(color = var1.pred))+
+  scale_color_viridis_c(option = "inferno")+
+  labs(fill = "Log Values")
+
+ggplot()+
+  geom_sf(data = meuse_fit,aes(color = var1.pred))+
+  scale_color_gradient(low = grey(0.7),high = "red")+
+  labs(fill = "Log Values")
+```
+
+```{r}
+## plot the uncertainty of the kriging estimator
+
+ggplot(meuse_fit)+
+  geom_sf(aes(color = var1.var))+
+  scale_color_gradient(low = grey(0.7),high = "red")+
+  geom_sf(data = meuse)
+
+ggplot()+
+  geom_sf(data = meuse_fit,aes(color = var1.pred))+
+  scale_color_viridis_c(option = "viridis")+
+  geom_sf(data = meuse)+
+  labs(fill = "Log Values")
+```

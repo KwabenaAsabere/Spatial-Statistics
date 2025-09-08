@@ -1,0 +1,486 @@
+---
+title: "TB INCIDENCE MODELLING"
+author: "K.Asabere"
+format: html
+engine: knitr
+editor: visual
+default-language: R
+code-overflow: wrap
+df-print: kable
+execute: 
+  echo: true
+  warning: false
+  message: false  
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+
+library(sf)
+library(terra)
+library(tidyverse)
+library(tidymodels)
+library(finalfit)
+library(gt)
+library(gstat)
+library(spatialreg)
+library(spdep)
+
+```
+
+```{r}
+
+```
+
+```{r}
+load("tb/africountries.rda")
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = africountries,aes(fill = pop_est))+
+  scale_fill_viridis_c()
+```
+
+```{r}
+load("tb/africontinent.rda")
+class(africontinent)
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = africontinent)
+```
+
+```{r}
+load("tb/afripop2020.rda")
+class(afripop2020)
+
+afripop2020_df <- as.data.frame(afripop2020,xy = TRUE)
+```
+
+```{r}
+afripop2020_df |> 
+ggplot(aes(x = x,y = y,fill = log(ppp_2020_1km_Aggregated) ))+
+  geom_raster()+
+  scale_fill_viridis_c(na.value = "white")+
+  labs(fill = "Pop.Density")
+```
+
+```{r}
+population <- read_csv("tb/population.csv")
+```
+
+```{r}
+pop_2023 <- population |> 
+  filter(Year == 2023) |> 
+  rename(
+    country = Entity,
+    population = `all years`
+  ) 
+
+```
+
+```{r}
+tb_incidence <- read_csv("tb/TB_burden_age_sex_2020-06-14.csv")
+```
+
+```{r}
+tb_inc <- read_csv("tb/Incidence of tuberculosis (per 100 000 population per year).csv")
+```
+
+```{r}
+tb_inc_2023 <- tb_inc |> 
+   filter(Period == 2023) |>
+ dplyr:: select(SpatialDimValueCode,Location,FactValueNumeric) |> 
+  rename(
+    iso3 = SpatialDimValueCode,
+    country = Location,
+    incidence_rate = FactValueNumeric
+  ) 
+```
+
+```{r}
+poverty <- read_csv("tb/share-of-population-living-in-extreme-poverty.csv")
+```
+
+```{r}
+poverty_df <- poverty |> 
+  filter(Year == 2014) |> 
+  rename(poverty_rate = `Share below $3 a day`) |> 
+ dplyr:: select(Country,poverty_rate)
+```
+
+```{r}
+continents <- read_sf("tb/continent_boundaries_7.gpkg")
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = continents,fill = "skyblue")
+```
+
+```{r}
+continents2 <- read_sf("tb/continent_boundaries_8.gpkg")
+```
+
+```{r}
+
+pip_pov <- read_csv("tb/pip_dataset.csv")
+```
+
+```{r}
+poverty2018 <- pip_pov |> 
+dplyr::select(country,year,headcount_ratio_international_povline) |> 
+  rename(poverty_rate = headcount_ratio_international_povline) |> 
+  filter(year == 2015)
+```
+
+```{r}
+tb_inc_2023 <-  tb_inc_2023 |> 
+  arrange(country)
+
+poverty2018 <- poverty2018 |> arrange(country)
+
+pop_2023 <-  pop_2023 |> 
+  arrange(country)
+```
+
+```{r}
+african_countries <- c(
+  "Algeria", "Angola", "Benin", "Botswana", "Burkina Faso", "Burundi",
+  "Cabo Verde", "Cameroon", "Central African Republic", "Chad", "Comoros",
+  "Democratic Republic Of The Congo", "Republic Of The Congo", "Côte D'Ivoire",
+  "Djibouti", "Egypt", "Equatorial Guinea", "Eritrea", "Eswatini", "Ethiopia",
+  "Gabon", "Gambia", "Ghana", "Guinea", "Guinea-Bissau", "Kenya", "Lesotho",
+  "Liberia", "Libya", "Madagascar", "Malawi", "Mali", "Mauritania",
+  "Mauritius", "Morocco", "Mozambique", "Namibia", "Niger", "Nigeria",
+  "Rwanda", "São Tomé And Príncipe", "Senegal", "Seychelles", "Sierra Leone",
+  "Somalia", "South Africa", "South Sudan", "Sudan", "Tanzania", "Togo",
+  "Tunisia", "Uganda", "Zambia", "Zimbabwe"
+)
+
+```
+
+```{r}
+
+afri_pop <- pop_2023 |> 
+    filter(country %in% african_countries)
+
+afri_tb <- tb_inc_2023 |> 
+    filter(country %in% african_countries)
+
+afri_pov <- poverty |> 
+    filter(Country %in% african_countries)
+
+afri_pov
+```
+
+```{r}
+poverty2018 <- pip_pov |> 
+dplyr::select(country,year,headcount_ratio_international_povline) |> 
+  rename(poverty_rate = headcount_ratio_international_povline) |> 
+  filter(year == 2018)
+```
+
+```{r}
+
+table(afri_pov$Year)
+```
+
+```{r}
+gdp <- read_csv("tb/GDP_Country.csv")
+names(gdp)
+```
+
+```{r}
+africa_gdp <- gdp |> 
+   filter(Country %in% african_countries) |> 
+  dplyr::select(Country,`GDP ($ per capita)`) |> 
+  rename(gdp = `GDP ($ per capita)`,
+         country = Country)
+```
+
+```{r}
+
+africa_c <- as.data.frame(african_countries)
+
+africa_c <- africa_c |> 
+  rename(country = african_countries)
+```
+
+```{r}
+africa_tb_data <-  africa_c |> 
+  left_join(afri_pop,by = "country") |> 
+  left_join(africa_gdp, by = "country") |> 
+  left_join(afri_tb,by = "country")
+```
+
+```{r}
+
+
+```
+
+```{r}
+
+africa_admin <- read_rds("tb/africa_gadm.rds")
+
+africa_admin <- st_as_sf(africa_admin)
+
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = africa_admin)
+```
+
+```{r}
+class(africa_admin)
+```
+
+```{r}
+africa_admin <- africa_admin |> 
+  rename(country = NAME_0)
+```
+
+```{r}
+
+africa_tb_data <-  africa_tb_data |> 
+  left_join(africa_admin |> dplyr::select(-country),by = c("iso3" = "GID_0"))
+```
+
+```{r}
+africa_tb_data <- africa_tb_data |> 
+ dplyr::select(country,iso3,population,gdp,incidence_rate,geometry)
+
+## saveRDS(africa_tb_data,"africa_tb_data.rds")
+```
+
+```{r}
+missing_glimpse(africa_tb_data)
+```
+
+```{r}
+africa_tb_data |> 
+  filter(is.na(iso3))
+```
+
+```{r}
+africa_tb_data_sf <- st_as_sf(africa_tb_data)
+
+ggplot()+
+  geom_sf(data = africa_tb_data_sf)
+```
+
+```{r}
+glimpse(africa_tb_data)
+```
+
+```{r}
+library(sf)
+africa_shp <- rnaturalearth::ne_countries(scale = "medium", continent = "Africa", returnclass = "sf")
+
+```
+
+```{r}
+africa_merged <- africa_shp |> 
+  left_join(africa_tb_data, by = c("iso_a3" = "iso3"))
+
+```
+
+```{r}
+
+library(tmap)
+
+tm_shape(africa_tb_data_sf) +
+  tm_polygons(
+    fill = "incidence_rate",
+    fill.scale = tm_scale(values = "brewer.reds"),
+    fill.legend = tm_legend(title = "TB Incidence per 100k")
+  ) +
+  tm_title("TB Incidence Rate in Africa")
+```
+
+```{r}
+class(africa_tb_data)
+```
+
+```{r}
+
+ggplot()+
+  geom_sf(data = africa_tb_data_sf,aes(fill = incidence_rate))+
+  scale_fill_viridis_c()
+```
+
+```{r}
+
+ggplot()+
+  geom_sf(data = africa_admin)
+```
+
+```{r}
+glimpse(africa_tb_data)
+```
+
+```{r}
+africa_tb_data_sf <- africa_tb_data_sf |> drop_na()
+```
+
+```{r}
+# sum(st_is_empty(africa_tb_data_sf))           # how many empties?
+# sum(!st_is_valid(africa_tb_data_sf))   
+# how many invalid?
+
+class(africa_tb_data_sf)
+```
+
+
+```{r}
+
+neighbors <- poly2nb(africa_tb_data_sf)
+weights <- nb2listw(neighbors, style = "W", zero.policy = TRUE)
+
+# Then continue like this:
+moran.test(africa_tb_data_sf$incidence_rate, weights, zero.policy = TRUE)
+
+# and for regression
+model_lag <- lagsarlm(incidence_rate ~ log(population) + log(gdp),
+                      data = africa_tb_data_sf,
+                      listw = weights,
+                      zero.policy = TRUE)
+
+
+```
+
+```{r}
+africa_tb_data_sf$iso3 <- factor(africa_tb_data_sf$iso3, levels = africa_tb_data_sf$iso3)
+
+
+library(INLA)
+
+library(spdep)
+neighbors <- poly2nb(africa_tb_data_sf)
+nb2INLA("africa.graph", neighbors)
+
+
+graph <- inla.read.graph("africa.graph")
+
+
+# Fit Bayesian BYM model
+bayes_model <- inla(
+  incidence_rate ~ f(iso3, model = "bym", graph = graph, values = levels(africa_tb_data_sf$iso3)) +
+    log(population) + log(gdp),
+  data = africa_tb_data_sf,
+  family = "gaussian"
+)
+
+summary(bayes_model)
+
+```
+
+```{r}
+# Extract structured spatial effect
+spatial_effect <- bayes_model$summary.random$iso3$mean[1:44]
+
+africa_tb_data_sf$spatial_effect <- spatial_effect
+
+library(tmap)
+tm_shape(africa_tb_data_sf) +
+  tm_polygons("spatial_effect", title = "Spatial Effect", palette = "RdBu") +
+  tm_title("Structured Spatial Random Effects (BYM)")
+
+```
+
+```{r}
+africa_tb_data_sf$fitted <- bayes_model$summary.fitted.values$mean
+
+plot(africa_tb_data_sf$incidence_rate, africa_tb_data_sf$fitted,
+     xlab = "Observed TB Incidence",
+     ylab = "Fitted TB Incidence",
+     main = "Observed vs Fitted")
+abline(0, 1, col = "red", lty = 2)
+
+```
+
+```{r}
+library(tmap)
+
+tm_shape(africa_tb_data_sf) +
+  tm_polygons(
+    fill = "spatial_effect",
+    fill.scale = tm_scale(values = "brewer.rd_bu", midpoint = 0),
+    fill.legend = tm_legend(title = "Spatial Effect")
+  ) +
+  tm_title("Structured Spatial Random Effects (BYM)")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

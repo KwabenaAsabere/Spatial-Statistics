@@ -1,0 +1,400 @@
+---
+title: "BOOSTING ALGORITHMS IN r"
+format: html
+df-print: kable
+code-overflow: wrap
+execute: 
+  echo: true
+  warning: false
+  message: false
+engine: knitr
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(terra)
+library(sf)
+library(tidyverse)
+library(ranger)
+library(tidymodels) # metapackage for modeling
+library(spatialsample) # for spatial cross-validation
+library(waywiser) # for area of applicability
+library(vip) # for variable importance (used in AOA))
+library(catboost)
+library(xgboost)
+library(bonsai)
+tidymodels_prefer()
+theme_set(theme_bw())
+```
+
+```{r}
+trainingdata <- sf::st_read("https://github.com/LOEK-RS/FOSSGIS2025-examples/raw/refs/heads/main/data/temp_train.gpkg")
+predictors <- terra::rast("https://github.com/LOEK-RS/FOSSGIS2025-examples/raw/refs/heads/main/data/predictors.tif")
+```
+
+```{r}
+predictors_df <- as.data.frame(predictors,xy = TRUE)
+```
+
+```{r}
+ggplot(predictors_df)+
+  geom_raster(aes(fill = coast,x = x,y = y))+
+  scale_fill_viridis_c(na.value = "transparent")
+```
+
+```{r}
+trainDat <- st_as_sf(terra::extract(predictors,trainingdata,bind = TRUE))
+predictor_names <- names(predictors)
+response_name <- "temp"
+```
+
+```{r}
+## recipe
+
+formula <- as.formula(paste(
+  response_name,
+  "~",
+  paste(predictor_names,collapse = "+")
+))
+
+print(formula)
+```
+
+```{r}
+recipe <- recipe(formula,data = trainDat)
+rf_model <- rand_forest(trees = 100,mode = "regression") |> 
+  set_engine("ranger",importance = "impurity")
+
+## create workflow
+workflow <- workflow() |> 
+  add_recipe(recipe) |> 
+  add_model(rf_model)
+
+## fit the model
+rf_fit <- fit(workflow,data = trainDat)
+
+
+```
+
+```{r}
+prediction_raster <- terra::predict(predictors,rf_fit,na.rm = TRUE)
+```
+
+```{r}
+plot(prediction_raster)
+```
+
+### Spatial Crossvalidation
+
+```{r}
+random_folds <- vfold_cv(trainDat,v = 4)
+block_folds <- spatialsample::spatial_block_cv(trainDat,v = 4, n = 2)
+spatialsample::autoplot(block_folds)
+```
+
+```{r}
+## control cross-validation
+keep_pred <- tune::control_resamples(save_pred = TRUE,save_workflow = TRUE)
+
+```
+
+```{r}
+## cross validation
+rf_random <- fit_resamples(
+  workflow,
+  resamples = random_folds,
+  control = keep_pred
+)
+
+rf_spatial <- fit_resamples(
+  workflow,
+  resamples = block_folds,
+  control = keep_pred
+)
+```
+
+```{r}
+## get CV metrics
+collect_metrics(rf_random)
+collect_metrics(rf_spatial)
+```
+
+```{r}
+## visualize predictions
+preds_random <- collect_predictions(rf_random)
+preds_spatial <- collect_predictions(rf_spatial)
+
+# Add labels for faceting
+preds_random$type <- "random"
+preds_spatial$type <- "spatial"
+
+preds <- dplyr::bind_rows(preds_random, preds_spatial)
+
+ggplot(preds, aes(x = temp, y = .pred)) +
+  geom_point(alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0,lwd = 1, color = "red", linetype = "dashed") +
+  facet_wrap(~type) +
+  labs(x = "temp", y = "Predicted")+
+  coord_obs_pred()
+```
+
+### Spatial Hyperparameter Tuning and Model Selection
+
+```{r}
+
+rf_model <- rand_forest(
+  trees = 100,
+  mode = "regression",
+  mtry = tune(),
+  min_n = tune()
+) |> 
+  set_engine("ranger",importance = "impurity")
+
+workflow <- update_model(workflow,rf_model)
+
+## define tunegrid
+grid_rf <- grid_space_filling(
+  mtry(range = c(1,20)),
+  min_n(range = c(2,10)),
+  size = 30
+)
+
+## tune
+rf_tuning <- tune_grid(
+  workflow,
+  resamples = block_folds,
+  grid = grid_rf,
+  control = keep_pred
+)
+```
+
+```{r}
+rf_tuning |> 
+  collect_metrics()
+```
+
+```{r}
+rf_tuning |> 
+  collect_metrics() |> 
+  mutate(min_n = factor(min_n)) |> 
+  ggplot(aes(x = mtry, y = mean,color = min_n))+
+  geom_line(linewidth = 1, alpha = 0.6)+
+  geom_point(size = 2)+
+  facet_wrap(~.metric,scales = "free",nrow = 2)+
+  scale_x_log10(labels = scales::label_number())+
+  scale_color_viridis_d(option = "viridis",begin = 0.9,end = 0)
+```
+
+```{r}
+finalmodel <- fit_best(rf_tuning)
+finalmodel
+```
+
+```{r}
+imp <- extract_fit_parsnip(finalmodel) |> 
+  vip::vip()
+
+imp
+```
+
+```{r}
+final_pred <- terra::predict(predictors,finalmodel,na.rm = TRUE)
+plot(final_pred)
+```
+
+### Area of Applicability
+
+The **waywiser** package provides a set of tools for assessing spatial models, including an implementation of multi-scale assessment and area of applicability. The area of applicability is a measure of how well the model (given the training data) can be applied to the prediction data. It can be calculated with the `ww_area_of_applicability()` function, and then predicted on the raster with `terra::predict()`.
+
+```{r}
+model_aoa <- waywiser::ww_area_of_applicability(
+    st_drop_geometry(trainDat[, predictor_names]),
+    importance = vip::vi_model(finalmodel)
+)
+AOA <- terra::predict(predictors, model_aoa)
+plot(AOA$aoa)
+plot(AOA$di)
+```
+
+### CatBoost
+
+Our task is to predict the temperature in Spain using a set of covariates. We have two datasets for that purpose: the first one, `temperature_train`, contains the temperature measurements from 195 locations in Spain, and the second one, `predictor_stack`, contains the covariates we will use to predict the temperature. These covariates include variables such as population density (`popdens`), distance to the coast (`coast`), and elevation (`elev`), among others.
+
+```{r}
+
+train_points <- sf::read_sf("https://github.com/LOEK-RS/FOSSGIS2025-examples/raw/refs/heads/main/data/temp_train.gpkg")
+predictor_stack <- terra::rast("https://github.com/LOEK-RS/FOSSGIS2025-examples/raw/refs/heads/main/data/predictors.tif")
+```
+
+We use a subset of fourteen of the available covariates to predict the temperature. But before doing that, to prepare our data for modeling, we need to extract the covariate values at the locations of our training points.
+
+```{r}
+predictor_names <- names(predictor_stack)[1:14]
+temperature_train <- terra::extract(predictor_stack[[predictor_names]],
+    train_points,
+    bind = TRUE
+) |>
+    sf::st_as_sf()
+```
+
+```{r}
+cat_spec <- boost_tree(
+  trees = 1000,
+  tree_depth = 6,
+  learn_rate = 0.1,
+) |> 
+  set_engine("catboost") |> 
+  set_mode("regression")
+```
+
+```{r}
+set.seed(22)
+
+formula_catboost <- as.formula(paste0("temp ~ ",paste(predictor_names,collapse = "+")))
+
+recipe <- recipe(formula_catboost,data =  temperature_train)
+
+workflow_catboost <- workflow() |> 
+  add_recipe(recipe = recipe) |> 
+  add_model(cat_spec)
+```
+
+```{r}
+block_folds <- spatial_block_cv(temperature_train, v = 5)
+spatialsample::autoplot(block_folds)
+```
+
+In **tidymodels**, the `fit_resamples()` function takes the previously defined workflow and the resampling folds. Here, we also use the `control` argument to save the predictions and the workflow, which can be useful for later analysis. The `fit_best()` function is used to fit the best model based on the resampling results.
+
+```{r}
+catboost_spatial <- fit_resamples(
+  workflow_catboost,
+  resamples = block_folds,
+  control = control_resamples(save_pred = TRUE,save_workflow = TRUE)
+)
+
+catboost_final_modell <- fit_best(catboost_spatial)
+```
+
+```{r}
+collect_metrics(catboost_spatial)
+```
+
+Our goal is to predict the temperature in Spain using the covariates from the `predictor_stack` dataset. Thus, we want to obtain a map of the predicted temperature values for the entire country. The `predict()` function of the **terra** package makes model predictions on the new raster data.
+
+```{r}
+pred_catboost <- terra::predict(predictor_stack,catboost_final_modell,na.rm = TRUE)
+plot(pred_catboost)
+```
+
+```{r}
+# train_points
+# temperature_train
+```
+
+```{r}
+spain_points <- tibble(
+  temp = temperature_train$temp,
+  temp_pred = predict(catboost_final_modell,temperature_train |> select(-temp))$.pred,
+  geometry = st_centroid(st_geometry(temperature_train))
+)
+
+spain_points <- st_as_sf(spain_points)
+
+spain_multi_scale <- ww_multi_scale(
+  spain_points,
+  truth = temp,
+  estimate = temp_pred,
+  n = list(c(5,5),c(2,2))
+)
+```
+
+```{r}
+
+
+spain_multi_scale |>
+  mutate(.grid = map(.grid, ~ select(.x, - .estimate))) |>
+  tidyr::unnest(cols = .grid) |>
+  # make a label for each block size
+  mutate(n_label = map_chr(.grid_args, ~ paste(.x$n, collapse = "x"))) |>
+  ggplot() +
+  geom_sf(aes(geometry = x, fill = .truth - .estimate)) +
+  facet_wrap(~ n_label) +
+  scale_fill_viridis_c(option = "C", na.value = "grey90") +
+  labs(
+    title = "Spatial Block Cross-Validation Residuals",
+    subtitle = "Residuals across different block sizes",
+    fill = "Residual"
+  ) +
+  theme_minimal()
+
+```
+
+```{r}
+spain_multi_scale |>
+  mutate(.grid = map(.grid, ~ select(.x, - .estimate))) |>
+  tidyr::unnest(cols = .grid) |>
+  mutate(n_label = map_chr(.grid_args, ~ paste(.x$n, collapse = "x"))) |>
+  ggplot() +
+  geom_sf(aes(geometry = x, fill = .truth), color = "white") +
+  facet_grid(.metric ~ n_label) +
+  scale_fill_viridis_c(option = "C", na.value = "grey90") +
+  labs(
+    title = "Spatial Block Cross-Validation",
+    subtitle = "RMSE and MAE across block sizes",
+    fill = "Metric Value"
+  ) +
+  theme_minimal()
+
+```
+
+```{r}
+spain_multi_scale_df <- spain_multi_scale |>
+  mutate(.grid = map(.grid, ~ select(.x, - .estimate))) |>
+  tidyr::unnest(cols = .grid) |>
+  mutate(
+    n_label = map_chr(.grid_args, ~ paste(unlist(.x$n), collapse = "x"))
+  )
+
+glimpse(spain_multi_scale_df)
+```
+
+```{r}
+spain_multi_scale_df |> 
+  ggplot() +
+  geom_sf(aes(geometry = x, fill = .truth), color = "white") +
+  facet_grid(.metric ~ n_label) +
+  scale_fill_viridis_c(option = "C", na.value = "grey90") +
+  labs(
+    title = "Spatial Block Cross-Validation",
+    subtitle = "RMSE and MAE across block sizes",
+    fill = "Metric Value"
+  ) +
+  theme_minimal()
+
+```
+
+```{r}
+ temperature_train_pred <-  temperature_train |> 
+  mutate(predictions = predict(catboost_final_modell,temperature_train |> select(-temp))$.pred)
+ 
+```
+
+```{r}
+
+local_moran <- ww_local_moran_i(temperature_train_pred, temp, predictions)
+
+temperature_train_pred <- temperature_train_pred |>
+  mutate(local_moran = local_moran$.estimate)
+
+ggplot(temperature_train_pred) +
+  geom_sf(aes(color = local_moran)) +
+  scale_color_viridis_c() +
+  theme_minimal() +
+  labs(title = "Local Moran’s I", fill = "I value")
+```
+
+```{r}
+
+```

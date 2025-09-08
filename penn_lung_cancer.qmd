@@ -1,0 +1,263 @@
+---
+title: "DISEASE RISK MAPPING"
+format: html
+df-print: kable
+code-overflow: wrap
+execute: 
+  echo: true
+  warning: false
+  message: false
+engine: knitr
+---
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(sf)
+library(spdep)
+library(terra)
+library(tmap)
+theme_set(theme_bw())
+library(SpatialEpi)
+
+load("data/pennLC.rda")
+load("data/pennLC_sf.rda")
+```
+
+```{r}
+head(pennLC_sf)
+
+pennLC_sf <- pennLC_sf |> 
+    arrange(county,race,gender,age)
+
+E <- expected(population = pennLC_sf$population,cases = pennLC_sf$cases, n.strata = 16)
+
+penn_data <- pennLC_sf |> 
+    group_by(county) |> 
+    summarise(Y = sum(cases),
+    smoking = mean(smoking,na.rm = TRUE),
+    population = sum(population)) |> 
+    mutate(E = E,
+    SMR = Y/E)
+```
+
+
+
+```{r}
+
+head(penn_data)
+glimpse(penn_data)
+
+```
+
+
+```{r}
+tmap_mode("plot")
+tm_shape(penn_data)+
+    tm_polygons(
+        fill = "SMR",
+        fill.scale = tm_scale_continuous(values = "-RdBu")
+    )+
+     tm_layout(legend.outside = TRUE)
+```
+
+
+```{r}
+library(INLA)
+nb <- poly2nb(penn_data,queen = TRUE)
+nb2INLA("penn.adj.graph",nb)
+
+g <- inla.read.graph(filename = "penn.adj.graph")
+
+library(igraph)
+M <- inla.graph2matrix(g)
+g_igraph <- graph_from_adjacency_matrix(M, mode="undirected")
+plot(g_igraph, vertex.size = 5, vertex.label = NA, edge.color="grey70")
+```
+
+
+
+```{r}
+centroids <- st_centroid(st_geometry(penn_data))
+edge_list <- which(M == 1, arr.ind = TRUE)
+edge_df <- data.frame(
+  x = st_coordinates(centroids)[edge_list[,1], 1],
+  y = st_coordinates(centroids)[edge_list[,1], 2],
+  xend = st_coordinates(centroids)[edge_list[,2], 1],
+  yend = st_coordinates(centroids)[edge_list[,2], 2]
+)
+```
+
+
+```{r}
+ggplot() +
+  geom_sf(data = penn_data, fill = "white", color = "black") +
+  geom_segment(data = edge_df,
+               aes(x = x, y = y, xend = xend, yend = yend),
+               color = "red", alpha = 0.5) +
+  geom_sf(data = centroids, color = "blue", size = 1) +
+  theme_minimal()
+
+```
+
+
+```{r}
+library(leaflet)
+
+M <- inla.graph2matrix(g)
+centroids <- st_centroid(st_geometry(penn_data))
+coords <- st_coordinates(centroids)
+
+edge_list <- which(M == 1, arr.ind = TRUE)
+edges <- data.frame(
+  x = coords[edge_list[,1], 1],
+  y = coords[edge_list[,1], 2],
+  xend = coords[edge_list[,2], 1],
+  yend = coords[edge_list[,2], 2]
+)
+
+leaflet(penn_data) %>%
+  addTiles() %>%
+  addPolygons(color = "black", weight = 1, fillOpacity = 0.2) %>%
+  addCircleMarkers(data = centroids, radius = 3, color = "blue") %>%
+  addPolylines(
+    lng = as.vector(t(cbind(edges$x, edges$xend))),
+    lat = as.vector(t(cbind(edges$y, edges$yend))),
+    color = "red", weight = 1, opacity = 0.5
+  )
+```
+
+
+```{r}
+penn_data <- penn_data |> 
+    mutate(
+        re_u = 1:n(),
+        re_v = 1:n()
+    )
+glimpse(penn_data)
+```
+
+
+
+```{r}
+formula <-  Y ~ smoking + 
+    f(re_u,
+    model = "bym2",
+    graph = "penn.adj.graph",
+    scale.model = TRUE,
+    hyper = list(
+        prec = list(prior = "pc.prec",param = c(1,0.01)),
+        phi = list(prior = "pc",param = c(0.5,2/3))
+    )
+    )
+```
+
+
+```{r}
+res <- inla(
+    formula,
+    family = "poisson",
+    data = penn_data,
+    E = E,
+    control.predictor = list(compute = TRUE),
+    control.compute = list(
+        dic = TRUE,
+        waic = TRUE,
+        cpo = TRUE,
+        return.marginals.predictor = TRUE
+    )
+)
+
+summary(res)
+```
+
+
+```{r}
+marginal <- inla.smarginal(res$marginals.fixed$smoking)
+marginal <- as.data.frame(marginal)
+
+marginal |> 
+    ggplot(aes(x =x,y = y))+
+    geom_line()+
+    geom_vline(xintercept = 0,linetype = "dashed",color = "red")+
+    labs(x = expression(beta[1]), y= "Density")
+```
+
+
+```{r}
+head(res$summary.fitted.values)
+penn_data <- penn_data |> 
+    mutate(
+        RR = res$summary.fitted.values$mean,
+        LL = res$summary.fitted.values$`0.025quant`,
+        UL = res$summary.fitted.values$`0.975quant`
+    )
+
+glimpse(penn_data)
+```
+
+
+
+```{r}
+library(leaflet)
+library(RColorBrewer)
+
+# Define a color palette for RR
+pal <- colorNumeric(
+  palette = "RdBu",   # diverging palette
+  domain = penn_data$RR,
+  reverse = TRUE      # make high = red, low = blue
+)
+
+# Build leaflet map
+leaflet(penn_data) %>%
+  addProviderTiles("CartoDB.Positron") %>%
+  addPolygons(
+    fillColor = ~pal(RR),
+    weight = 1,
+    opacity = 1,
+    color = "grey30",
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 3,
+      color = "#666",
+      dashArray = "",
+      fillOpacity = 0.9,
+      bringToFront = TRUE
+    ),
+    label = ~paste0(
+      "<b>", county, "</b><br/>",
+      "RR: ", round(RR, 3), "<br/>",
+      "95% CI: [", round(LL, 3), ", ", round(UL, 3), "]<br/>",
+      "SMR: ", round(SMR, 3)
+    ) %>% lapply(htmltools::HTML)
+  ) %>%
+  addLegend(
+    pal = pal,
+    values = ~RR,
+    opacity = 0.7,
+    title = "Relative Risk (RR)",
+    position = "bottomright"
+  )
+
+```
+
+
+
+```{r}
+tm_shape(penn_data)+
+    tm_polygons(
+        fill = "RR",
+        fill.scale = tm_scale_continuous(
+            values = "-brewer.rd_bu"
+        )
+    )+
+tm_layout(legend.outside = TRUE)
+```
+
+
+
+```{r}
+
+```

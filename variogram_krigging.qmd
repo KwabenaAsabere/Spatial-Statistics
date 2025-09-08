@@ -1,0 +1,678 @@
+---
+title: "OVERVIEW OF SPATIAL STATISITCS"
+format: html
+engine: knitr
+editor: visual
+default-language: R
+code-overflow: wrap
+df-print: kable
+execute: 
+  echo: true
+  warning: false
+  message: false  
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+
+```
+
+```{r}
+library(tidyverse)
+library(tidyverse)
+library(broom)
+library(janitor)
+library(gt)
+library(gtsummary)
+theme_set(theme_bw())
+```
+
+```{r}
+library(sf)
+library(terra)
+library(gstat)
+```
+
+```{r}
+## load the meuse data
+
+meuse <- read_csv("meuse.csv")
+meause_grid <- read_csv("meuse.grid.csv")
+
+## convert to sf type
+meuse <- st_as_sf(meuse,coords = c("x","y"))
+meuse_grid <- st_as_sf(meause_grid,coords = c("x","y"))
+
+meuse <- meuse |> 
+  mutate(log_zinc = log(zinc))
+st_crs(meuse) <- 28992
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = meuse,aes(size = zinc),alpha = 0.5)
+```
+
+```{r}
+vario <- variogram(log(zinc) ~ sqrt(dist),data = meuse)
+
+vario
+
+vario_df <- as.data.frame(vario)
+vario_df
+```
+
+```{r}
+vario_df |> 
+  ggplot(aes(x = dist, y= gamma))+
+  geom_point(color = "steelblue",size = 2)+
+  geom_line(color = "steelblue",linewidth = 0.8)
+```
+
+```{r}
+
+vario_meuse <- variogram(
+  log(zinc)~ 1,
+  data = meuse,
+  cutoff = 2000,
+  width = 50
+)
+
+vario_meuse
+
+
+vario_meuse_df <- as.data.frame(vario_meuse)
+```
+
+```{r}
+ggplot(vario_meuse_df, aes(x = dist, y = gamma)) +
+  geom_point(color = "darkgreen", size = 2) +
+  geom_line(color = "darkgreen", linewidth = 0.8) +
+  labs(
+    title = "Empirical Variogram of Log Zinc",
+    x = "Distance (m)",
+    y = "Semivariance"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+vgm_model <- fit.variogram(
+  object = vario_meuse,
+  model = vgm(psill = 0.7,model = "Exp",nugget = 0.1)
+)
+
+vgm_line = variogramLine(vgm_model,maxdist = max(vario_meuse[["dist"]]))
+
+```
+
+```{r}
+vario_meuse_df |> 
+  ggplot(aes(x = dist, y = gamma))+
+  geom_point(color = "darkgreen") +
+  geom_line(color = "darkgreen") +
+  geom_line(data = vgm_line, aes(x = dist, y = gamma), color = "red", linewidth = 1) +
+  labs(
+    title = "Empirical and Fitted Variogram",
+    x = "Distance (m)",
+    y = "Semivariance"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+print(vgm_model)
+```
+
+```{r}
+models <- c("Exp","Sph","Gau")
+
+vgm_fits <- map(models, ~fit.variogram(
+  object = vario_meuse,
+  model = vgm(psill = 0.7,model = "Exp",nugget = 0.1)
+))
+
+names(vgm_fits) <- models
+vgm_fits
+```
+
+```{r}
+model_lines <- imap_dfr(vgm_fits, ~ {
+  variogramLine(.x, maxdist = max(vario_meuse[["dist"]])) %>%
+    as.data.frame() %>%
+    mutate(model = .y)
+})
+
+model_lines <- model_lines |> 
+  mutate(model = factor(model))
+```
+
+```{r}
+ggplot() +
+  geom_point(data = vario_meuse_df, aes(x = dist, y = gamma), color = "black", size = 2) +
+  geom_line(data = vario_meuse_df, aes(x = dist, y = gamma), color = "black") +
+  geom_line(data = model_lines, aes(x = dist, y = gamma, color = model, linetype = model), linewidth = 1.1) +
+  scale_color_manual(values = c("Exp" = "red", "Gau" = "forestgreen", "Sph" = "blue")) +
+  scale_linetype_manual(values = c("Exp" = "solid", "Gau" = "dashed", "Sph" = "dotdash")) +
+  labs(
+    title = "Empirical and Fitted Variogram Models",
+    x = "Distance (m)",
+    y = "Semivariance",
+    color = "Model",
+    linetype = "Model"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+cv_results <- imap_dfr(vgm_fits, ~ {
+  cv <- krige.cv(log_zinc ~ 1, meuse, model = .x)
+  tibble(
+    model = .y,
+    RMSE = sqrt(mean(cv$residual^2)),
+    ME = mean(cv$residual),
+    MAE = mean(abs(cv$residual))
+  )
+})
+
+cv_results %>% arrange(RMSE)
+```
+
+### Krigging
+
+```{r}
+st_crs(meuse) <- 28992
+st_crs(meuse_grid) <- 28992
+```
+
+```{r}
+best_model <- vgm_fits[["Sph"]]
+best_model
+
+
+kriged <- krige(log(zinc) ~ 1, 
+                locations =  meuse,
+                newdata= meuse_grid, 
+                model = best_model)
+```
+
+```{r}
+kriged_sf <- st_as_sf(kriged)
+
+```
+
+```{r}
+#spplot(kriged["var1.pred"], main = "Kriged Prediction: Log Zinc")
+```
+
+```{r}
+kriged_sf <- st_as_sf(kriged)
+ggplot(kriged_sf) +
+  geom_sf(aes(color = var1.pred)) +
+  scale_color_viridis_c(name = "Log-Zinc (Kriged)") +
+  theme_minimal()
+
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = meuse,aes(color = log(zinc)))+
+    scale_color_viridis_c(name = "Log-Zinc (Kriged)") +
+  theme_minimal() 
+  
+```
+
+```{r}
+kriged_sf <- st_as_sf(kriged)
+ggplot(kriged_sf) +
+  geom_sf(aes(color = var1.var),alpha = 0.5) +
+  geom_sf(data = meuse,color = "black",size = 2)+
+  scale_color_viridis_c(name = "Log-Zinc (Kriged)",option = "inferno") +
+  theme_minimal()
+
+```
+
+### Linear and Non-linear Trends in Space
+
+```{r}
+## extract coordinates
+meuse <- meuse %>% 
+  mutate(x = st_coordinates(.)[,1],
+         y = st_coordinates(.)[,2])
+
+
+meuse_grid <- meuse_grid %>% 
+  mutate(x = st_coordinates(.)[,1],
+         y = st_coordinates(.)[,2])
+```
+
+```{r}
+meuse |> 
+  ggplot(aes(x = x, y = log(zinc)))+
+  geom_point()+
+  labs(x = "Longitude")
+
+meuse |> 
+  ggplot(aes(x = y, y = log(zinc)))+
+  geom_point()+
+  labs( x = "Latitude")
+```
+
+```{r}
+## extract coordinates
+meuse <- meuse %>% 
+  mutate(x = st_coordinates(.)[,1],
+         y = st_coordinates(.)[,2])
+
+
+meuse_grid <- meuse_grid %>% 
+  mutate(x = st_coordinates(.)[,1],
+         y = st_coordinates(.)[,2])
+```
+
+```{r}
+
+## linear trend
+vgm_uk_lin <- variogram(log(zinc) ~ x + y + sqrt(dist), meuse)
+vgm_uk_lin_fit <- fit.variogram(vgm_uk_lin, model = vgm(0.6, "Sph", 900, 0.1))
+```
+
+```{r}
+## polynomial trend
+vgm_uk_poly <- variogram(log(zinc) ~ poly(x,2) + poly(y,2) + sqrt(dist), meuse)
+vgm_uk_poly_fit <-  fit.variogram(vgm_uk_poly, model = vgm(0.6, "Sph", 900, 0.1))
+```
+
+```{r}
+
+## # Includes interaction term for full quadratic surface
+vgm_full_poly_surf <- variogram(log(zinc) ~ x + y + I(x^2) + I(y^2) + I(x * y) + sqrt(dist),data = meuse)
+
+vgm_full_poly_surf_fit <- fit.variogram(vgm_full_poly_surf, model = vgm(0.6, "Sph", 900, 0.1))
+```
+
+```{r}
+kriged_uk_poly <- krige(log(zinc) ~ poly(x,2) + poly(y,2) + sqrt(dist),
+                   locations = meuse,
+                   newdata = meuse_grid,
+                   model = vgm_uk_lin_fit)
+```
+
+```{r}
+ggplot(st_as_sf(kriged_uk_poly)) +
+  geom_sf(aes(color = var1.pred)) +
+  scale_color_viridis_c(name = "Kriged log(zinc)\n(with trend)") +
+  theme_minimal()
+```
+
+### Test Polynomial Degrees of Spatial Trend
+
+```{r}
+# Degree 1 (linear)
+uk_formula1 <- log(zinc) ~ x + y +  sqrt(dist)
+
+# Degree 2 (quadratic)
+uk_formula2 <- log(zinc) ~ x + y + I(x^2) + I(y^2) + I(x * y) +  sqrt(dist)
+
+# Degree 3 (cubic)
+#uk_formula3 <- log(zinc) ~ poly(x, 3) + poly(y, 3) + sqrt(dist)
+
+```
+
+```{r}
+formulas <- list(Ordinary = log(zinc) ~ 1,
+                 Poly1 = uk_formula1,
+                 Poly2 = uk_formula2
+                )
+
+kriging_results <- purrr::imap_dfr(formulas, function(formula, name) {
+  vgm_emp <- variogram(formula, meuse)
+  vgm_fit <- fit.variogram(vgm_emp, model = vgm(0.6, "Sph", 900, 0.1))
+  cv <- krige.cv(formula, meuse, model = vgm_fit)
+
+  tibble(
+    model = name,
+    RMSE = sqrt(mean(cv$residual^2)),
+    MAE = mean(abs(cv$residual)),
+    ME = mean(cv$residual)
+  )
+})
+
+kriging_results |> 
+  arrange(RMSE)
+```
+
+```{r}
+library(knitr)
+
+kable(kriging_results, digits = 4, caption = "Cross-Validation Results for Kriging Models")
+
+```
+
+```{r}
+cv_best <- krige.cv(uk_formula2, meuse, model = fit.variogram(variogram(uk_formula2, meuse), vgm(0.6, "Sph", 900, 0.1)))
+
+ggplot(data.frame(obs = cv_best$observed, pred = cv_best$var1.pred), aes(x = obs, y = pred)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, color = "red") +
+  labs(title = "Observed vs Predicted (Universal Kriging, Poly2)",
+       x = "Observed", y = "Predicted") +
+  theme_minimal()
+
+```
+
+### Geostatistical_Spartial Regression
+
+```{r}
+library(spatialreg)
+library(spdep)
+```
+
+```{r}
+meuse$sqrt_dist <- sqrt(meuse$dist.m)
+
+```
+
+```{r}
+## convert sf to sp for spatialreg
+
+library(sp)
+
+meuse_sp <- as(meuse, "Spatial")  # converts sf to SpatialPointsDataFrame
+
+# Now this works:
+nb <- knn2nb(knearneigh(coordinates(meuse_sp), k = 5))
+
+```
+
+```{r}
+## create spatial weights matrix
+# Find neighbors using k-nearest (k=5 is common)
+nb <- knn2nb(knearneigh(coordinates(meuse_sp), k = 5))
+```
+
+```{r}
+## if you don't want to convert
+coords <- st_coordinates(meuse)
+nb <- knn2nb(knearneigh(coords, k = 5))
+
+```
+
+```{r}
+
+# Row-standardized spatial weights
+library(spdep)
+lw <- nb2listw(nb, style = "W")
+
+```
+
+```{r}
+plot(nb,coords)
+```
+
+```{r}
+## Spatial Lag Models (SAR)
+
+lag_model <- lagsarlm(log(zinc) ~  sqrt_dist, data = meuse_sp, listw = lw)
+summary(lag_model)
+
+```
+
+```{r}
+### Spatial Error Model
+error_model <- errorsarlm(log(zinc) ~   sqrt_dist, data = meuse_sp, listw = lw)
+summary(error_model)
+```
+
+```{r}
+###  Spatial Durbin Model (includes spatial lags of predictors)
+
+durbin_model <- lagsarlm(log(zinc) ~  sqrt_dist, data = meuse_sp, listw = lw, type = "mixed")
+summary(durbin_model)
+```
+
+```{r}
+## Model Comparison
+AIC(lag_model, error_model, durbin_model)
+
+```
+
+```{r}
+sqrt(mean(residuals(lag_model)^2))
+sqrt(mean(residuals(error_model)^2))
+
+```
+
+#### Bayesian Spatial Regression
+
+```{r}
+
+library(INLA)
+```
+
+```{r}
+lyme_data <- read_rds("nys_lyme_data.rds")
+nyc <- st_read("Counties.shp")
+```
+
+```{r}
+
+library(spdep)
+library(sf)
+
+
+
+# Create neighborhood structure
+nb <- poly2nb(st_geometry(lyme_data))  # meuse_sf must be polygon-based
+#g <- inla.read.graph(nb2INLA(nb))     # convert nb object to INLA graph
+
+```
+
+```{r}
+
+glimpse(lyme_data)
+```
+
+```{r}
+scag_region <- st_read("pysal/scag_region.gpkg")
+
+plot(scag_region)
+class(scag_region)
+```
+
+```{r}
+
+ggplot()+
+  geom_sf(data = nyc,fill = "grey95")+
+  labs(title = "New York City Counties")
+```
+
+```{r}
+st_geometry(nyc)
+st_geometry(lyme_data)
+```
+
+```{r}
+nys_lyme_data <- lyme_data |> 
+  filter(!is.na(Lyme.Incidence.Rate))
+
+nyc
+```
+
+```{r}
+## neighbors
+library(spdep)
+lyme_nb <- poly2nb(nys_lyme_data,queen = TRUE)
+class(lyme_nb)
+
+
+```
+
+```{r}
+str(lyme_nb)
+```
+
+```{r}
+st_geometry(nys_lyme_data)
+```
+
+```{r}
+
+
+# st_crs(sf1)
+# st_crs(sf2)
+# 
+# # Reproject if needed
+# sf2 <- st_transform(sf2, crs = st_crs(sf1))
+
+```
+
+```{r}
+st_crs(nys_lyme_data)
+st_crs(nyc)
+```
+
+```{r}
+## to join two sf objects with dplyr, you must drop the geometry of one of the dataframes
+
+lyme_attr <- st_drop_geometry(lyme_data)
+nys_lyme_joined <- left_join(nyc,lyme_attr,by = c("NAME","FIPS_CODE"))
+
+nys_lyme_joined <-  nys_lyme_joined |>  
+  filter(!is.na(Lyme.Incidence.Rate))
+```
+
+```{r}
+
+library(spdep)
+## contiguity based 
+lyme_nb <- poly2nb(nys_lyme_joined,queen = TRUE)
+lyme_weights <- nb2listw(lyme_nb,style = "W")
+
+```
+
+```{r}
+str(lyme_nb)
+```
+
+```{r}
+
+## K-nearest neighbors
+coords <- st_coordinates(st_centroid(nys_lyme_joined))
+lyme_knn_nb <- knn2nb(knearneigh(coords,k = 5))
+str(lyme_knn_nb)
+
+knn_weights <- nb2listw(lyme_knn_nb,style = "W")  # Row-standardized weights
+
+str(knn_weights)
+
+```
+
+```{r}
+
+## Distance based
+
+coords <- st_coordinates(st_centroid(nys_lyme_joined))
+## threshold that ensures every point has at least one neighbor
+dthresh <- max(unlist(nbdists(dnearneigh(coords, 0, Inf), coords)))
+
+## custom threshold 50,000m = 50km
+d_thresh <- 100000
+
+dist_nb <- dnearneigh(coords, d1 = 0,d2 = d_thresh)
+
+# d1 = 0: lower bound (exclude self)
+# d2: upper bound (max distance to be considered a neighbor)
+
+dist_weights <- nb2listw(dist_nb,style = "W")
+```
+
+```{r}
+
+str(dist_nb)
+```
+
+```{r}
+
+lyme_IR <- nys_lyme_joined |> pull(Lyme.Incidence.Rate)
+log_lyme_IR <- log(lyme_IR)
+lyme_mc <- moran.mc(log_lyme_IR,
+                    listw = knn_weights,
+                    nsim = 999)
+```
+
+```{r}
+lyme_mc
+```
+
+```{r}
+plot(lyme_mc)
+```
+
+```{r}
+names(lyme_mc)
+# lyme_mc[["res"]]
+
+lyme_mc_df <- data.frame(simulated_I = lyme_mc[["res"]])
+
+head(lyme_mc_df)
+
+observed_I <- lyme_mc[["statistic"]]
+```
+
+```{r}
+
+lyme_mc_df |> 
+  ggplot(aes(x = simulated_I))+
+  geom_histogram(color = "white")+
+  geom_vline(aes(xintercept = observed_I), color = "red",linewidth = 1)+
+  labs(
+    title = "Monte-carlo Simulation of Moran I",
+    x = "Long Incidence Rate",
+    y = "Density",
+    subtitle = paste("Observed Moran's I =", round(observed_I, 4))
+    )
+```
+
+```{r}
+
+plot(st_geometry(nys_lyme_joined), border = "grey")
+plot(lyme_knn_nb, coords = coords, add = TRUE, col = "blue")
+
+```
+
+```{r}
+
+moran.plot(lyme_IR,
+           listw = knn_weights)
+```
+
+```{r}
+# Assume lyme_knn_nb is your nb object and coords is a matrix
+edges <- purrr::map_dfr(1:length(lyme_knn_nb), function(i) {
+  neighbors <- lyme_knn_nb[[i]]
+  if (length(neighbors) == 0) return(NULL)
+  data.frame(
+    x = coords[i, 1],
+    y = coords[i, 2],
+    xend = coords[neighbors, 1],
+    yend = coords[neighbors, 2]
+  )
+})
+```
+
+```{r}
+ggplot() +
+  geom_sf(data = nys_lyme_joined, fill = "white", color = "grey40") +
+  geom_segment(data = edges, aes(x = x, y = y, xend = xend, yend = yend), 
+               color = "blue", linewidth = 0.4) +
+  geom_point(data = as.data.frame(coords), aes(x = X, y = Y), 
+             color = "black", size = 1.5) +
+  theme_minimal()
+
+```
+
+```{r}
+
+```

@@ -1,0 +1,200 @@
+---
+title: "MAPPING IN R"
+format: html
+editor: visual
+engine: knitr
+editor: visual
+default-language: R
+code-overflow: wrap
+df-print: kable
+execute: 
+  echo: true
+  warning: false
+  message: false  
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(sf)
+library(terra)
+library(tidyverse)
+library(tidymodels)
+library(finalfit)
+library(gt)
+library(gstat)
+library(spatialreg)
+library(tmap)
+library(leaflet)
+```
+
+```{r}
+# wyoming <- read_sf("wyoming.geojson")
+```
+
+```{r}
+
+class(wyoming)
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = wyoming)
+```
+
+```{r}
+wyoming <- read_sf("https://data.rfortherestofus.com/wyoming.geojson")
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = wm,fill = "steelblue")
+```
+
+```{r}
+usa <- read_sf("rest/ne_50m_populated_places.geojson")
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = usa)
+```
+
+```{r}
+wyoming
+```
+
+```{r}
+
+philly_crimes <- read_csv("philly_crimes.csv")
+philly_crimes <- philly_crimes |> drop_na() |> 
+  filter(lng !=0 & lat != 0)
+philly_crimes_sf <- st_as_sf(philly_crimes ,coords = c("lng","lat"),crs = 4326)
+```
+
+```{r}
+philly_crimes_sf |> 
+  ggplot()+
+  geom_sf()
+```
+
+```{r}
+
+ny_counties <- read_sf("Counties.shp")
+```
+
+```{r}
+ny_counties |> 
+  ggplot()+
+  geom_sf()
+```
+
+```{r}
+head(st_geometry(philly_crimes_sf))
+st_crs(philly_crimes_sf)
+sum(st_is_empty(philly_crimes_sf))
+nrow(philly_crimes_sf)
+st_bbox(philly_crimes_sf)
+```
+
+```{r}
+coords <- st_coordinates(philly_crimes_sf)
+```
+
+```{r}
+ggplot(philly_crimes_sf) +
+  geom_sf(size = 0.1, alpha = 0.3) +
+  coord_sf(xlim = c(-75.3, -74.9), ylim = c(39.85, 40.15), expand = FALSE)
+
+```
+
+```{r}
+atlanta <- read_sf("atlanta-crimes.geojson")
+```
+
+```{r}
+class(atlanta)
+atlanta
+```
+
+```{r}
+atlanta |> 
+  ggplot()+
+  geom_sf(aes(fill = robbery))+
+  scale_fill_viridis_c() 
+
+
+```
+
+```{r}
+africa <- read.table("africa.graph")
+```
+
+```{r}
+tm_shape(atlanta) +
+  tm_polygons(
+    fill = "auto_theft",
+    fill.scale = tm_scale(values = "brewer.reds"),
+    fill.legend = tm_legend(title = "Auto Theft")
+  ) +
+  tm_title("Auto Theft in Atlanta Hexagons")
+```
+
+```{r}
+lyme_data <- read_rds("nys_lyme_data.rds")
+```
+
+```{r}
+
+
+  ggplot()+
+  geom_sf(data = ny_counties)
+  
+  
+  ggplot()+
+    geom_sf(data = lyme_data,aes(fill = log(Lyme.Incidence.Rate))) +
+    scale_fill_viridis_c(na.value = "white")
+```
+
+```{r}
+lyme_data
+```
+
+```{r}
+counties <- read_sf("cb_2024_us_county_500k.kml")
+
+ggplot()+
+  geom_sf(data = counties)
+```
+
+```{r}
+states <- read_sf("cb_2024_us_state_500k.kml")
+
+states |> 
+  ggplot()+
+  geom_sf()
+```
+
+```{r}
+wyoming_counties <- read_sf("rest/tl_2024_56_cousub.shp")
+```
+
+```{r}
+wyoming_counties |> 
+  ggplot()+
+  geom_sf(fill = "grey95")
+```
+
+```{r}
+wyoming_counties |> 
+  summarise(n_counties = n_distinct(COUNTYFP))
+
+wyoming_counties |> 
+  distinct(COUNTYFP)
+
+```
+
+```{r}
+
+
+```

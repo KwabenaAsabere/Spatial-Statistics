@@ -130,7 +130,7 @@ philly_crimes_sf <- st_as_sf(philly_crimes,
 ```
 
 ```{r}
-st_geometry_type(philly_crimes_sf)
+# st_geometry_type(philly_crimes_sf)
 st_crs(philly_crimes_sf)
 ```
 
@@ -148,7 +148,7 @@ ggplot() +
 ```
 
 ```{r}
-st_geometry_type(philly_crimes_sf)
+# st_geometry_type(philly_crimes_sf)
 st_crs(philly_crimes_sf)
 plot(st_geometry(philly_crimes_sf))  # base R check
 
@@ -655,6 +655,17 @@ nys_lyme_data_wgs84 <- st_transform(nys_lyme_data, crs = 4326)
 ```
 
 ```{r}
+library(leaflet)
+
+# Define color palette function
+pal <- colorFactor(
+  palette = c("High-High" = "#FF0000", 
+              "Low-Low" = "#0000FF", 
+              "Not significant" = "#eeeeee"),
+  domain = nys_lyme_data_wgs84$cluster_label
+)
+
+# Create leaflet map
 leaflet(nys_lyme_data_wgs84) %>%
   addProviderTiles(providers$CartoDB.Positron) %>%
   addPolygons(
@@ -671,6 +682,7 @@ leaflet(nys_lyme_data_wgs84) %>%
   ) %>%
   addLegend("bottomright", pal = pal, values = ~cluster_label,
             title = "LISA Cluster")
+
 
 
 ```

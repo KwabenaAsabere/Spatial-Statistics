@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.4.553">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>DISEASE RISK MAPPING</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="geostatistical_models_files/libs/clipboard/clipboard.min.js"></script>
+<script src="geostatistical_models_files/libs/quarto-html/quarto.js"></script>
+<script src="geostatistical_models_files/libs/quarto-html/popper.min.js"></script>
+<script src="geostatistical_models_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="geostatistical_models_files/libs/quarto-html/anchor.min.js"></script>
+<link href="geostatistical_models_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="geostatistical_models_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="geostatistical_models_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="geostatistical_models_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="geostatistical_models_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<link href="geostatistical_models_files/libs/htmltools-fill-0.5.8.1/fill.css" rel="stylesheet">
+
+<script src="geostatistical_models_files/libs/htmlwidgets-1.6.4/htmlwidgets.js"></script>
+
+<script src="geostatistical_models_files/libs/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+
+<link href="geostatistical_models_files/libs/leaflet-1.3.1/leaflet.css" rel="stylesheet">
+
+<script src="geostatistical_models_files/libs/leaflet-1.3.1/leaflet.js"></script>
+
+<link href="geostatistical_models_files/libs/leafletfix-1.0.0/leafletfix.css" rel="stylesheet">
+
+<script src="geostatistical_models_files/libs/proj4-2.6.2/proj4.min.js"></script>
+
+<script src="geostatistical_models_files/libs/Proj4Leaflet-1.0.1/proj4leaflet.js"></script>
+
+<link href="geostatistical_models_files/libs/rstudio_leaflet-1.3.1/rstudio_leaflet.css" rel="stylesheet">
+
+<script src="geostatistical_models_files/libs/leaflet-binding-2.2.2/leaflet.js"></script>
+
+<script src="geostatistical_models_files/libs/leaflet-providers-2.0.0/leaflet-providers_2.0.0.js"></script>
+
+<script src="geostatistical_models_files/libs/leaflet-providers-plugin-2.2.2/leaflet-providers-plugin.js"></script>
+
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">DISEASE RISK MAPPING</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidymodels)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(sf)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(spdep)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(terra)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tmap)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(SpatialEpi)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(INLA)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(leaflet)</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="fu">theme_set</span>(<span class="fu">theme_bw</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="st">"data/gambia.rda"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(gambia)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div class="kable-table">
+<table class="table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;"></th>
+<th style="text-align: right;">x</th>
+<th style="text-align: right;">y</th>
+<th style="text-align: right;">pos</th>
+<th style="text-align: right;">age</th>
+<th style="text-align: right;">netuse</th>
+<th style="text-align: right;">treated</th>
+<th style="text-align: right;">green</th>
+<th style="text-align: right;">phc</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">1850</td>
+<td style="text-align: right;">349631.3</td>
+<td style="text-align: right;">1458055</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">1783</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">40.85</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">1851</td>
+<td style="text-align: right;">349631.3</td>
+<td style="text-align: right;">1458055</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">404</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">40.85</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">1852</td>
+<td style="text-align: right;">349631.3</td>
+<td style="text-align: right;">1458055</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">452</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">40.85</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">1853</td>
+<td style="text-align: right;">349631.3</td>
+<td style="text-align: right;">1458055</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">566</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">40.85</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">1854</td>
+<td style="text-align: right;">349631.3</td>
+<td style="text-align: right;">1458055</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">598</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">40.85</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">1855</td>
+<td style="text-align: right;">349631.3</td>
+<td style="text-align: right;">1458055</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">590</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">40.85</td>
+<td style="text-align: right;">1</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>gambia_sf <span class="ot">&lt;-</span> gambia <span class="sc">|&gt;</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(x, y) <span class="sc">|&gt;</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">total =</span> <span class="fu">n</span>(),</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">positive =</span> <span class="fu">sum</span>(pos),</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">prevalence =</span> positive <span class="sc">/</span> total,</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">"drop"</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">id =</span> <span class="fu">row_number</span>()) <span class="sc">|&gt;</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_as_sf</span>(<span class="at">coords =</span> <span class="fu">c</span>(<span class="st">"x"</span>, <span class="st">"y"</span>), <span class="at">crs =</span> <span class="dv">32628</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_transform</span>(<span class="dv">4326</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(gambia_sf)<span class="sc">+</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="geostatistical_models_files/figure-html/unnamed-chunk-5-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>gambia_senegal <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="st">"data/senegal_and_gambia_Senegal_and_Gambia_Country_Boundary.geojson"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Reading layer `temp_download_a1163408769f4ddf903e8cfb2759cf3e' from data source 
+  `C:\Users\KAsab\Desktop\SPATIAL STATISTICS\data\senegal_and_gambia_Senegal_and_Gambia_Country_Boundary.geojson' 
+  using driver `GeoJSON'
+Simple feature collection with 2 features and 6 fields
+Geometry type: MULTIPOLYGON
+Dimension:     XY
+Bounding box:  xmin: -17.53092 ymin: 12.30777 xmax: -11.34801 ymax: 16.69373
+Geodetic CRS:  WGS 84</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(gambia_senegal) <span class="sc">+</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="geostatistical_models_files/figure-html/unnamed-chunk-7-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>gm_sf <span class="ot">&lt;-</span> <span class="fu">st_read</span>(<span class="st">"data/gm.json"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Reading layer `gm' from data source 
+  `C:\Users\KAsab\Desktop\SPATIAL STATISTICS\data\gm.json' using driver `GeoJSON'
+Simple feature collection with 6 features and 3 fields
+Geometry type: POLYGON
+Dimension:     XY
+Bounding box:  xmin: -16.8297 ymin: 13.06501 xmax: -13.81871 ymax: 13.81998
+Geodetic CRS:  WGS 84</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>gm_sf</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div class="kable-table">
+<table class="table table-sm table-striped small">
+<colgroup>
+<col style="width: 31%">
+<col style="width: 5%">
+<col style="width: 19%">
+<col style="width: 43%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">source</th>
+<th style="text-align: left;">id</th>
+<th style="text-align: left;">name</th>
+<th style="text-align: left;">geometry</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">https://simplemaps.com</td>
+<td style="text-align: left;">GMM</td>
+<td style="text-align: left;">Central River</td>
+<td style="text-align: left;">POLYGON ((-14.46213 13.5166…</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">https://simplemaps.com</td>
+<td style="text-align: left;">GMN</td>
+<td style="text-align: left;">North Bank</td>
+<td style="text-align: left;">POLYGON ((-15.49803 13.6415…</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">https://simplemaps.com</td>
+<td style="text-align: left;">GMU</td>
+<td style="text-align: left;">Upper River</td>
+<td style="text-align: left;">POLYGON ((-14.55211 13.3230…</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">https://simplemaps.com</td>
+<td style="text-align: left;">GML</td>
+<td style="text-align: left;">Lower River</td>
+<td style="text-align: left;">POLYGON ((-15.29996 13.4961…</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">https://simplemaps.com</td>
+<td style="text-align: left;">GMW</td>
+<td style="text-align: left;">West Coast</td>
+<td style="text-align: left;">POLYGON ((-16.15128 13.2838…</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">https://simplemaps.com</td>
+<td style="text-align: left;">GMB</td>
+<td style="text-align: left;">Banjul</td>
+<td style="text-align: left;">POLYGON ((-16.59553 13.3850…</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(gm_sf)<span class="sc">+</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">linewidth =</span> <span class="fl">0.7</span>)<span class="sc">+</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> gambia_sf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="geostatistical_models_files/figure-html/unnamed-chunk-9-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># gambia_sf</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a><span class="co"># gambia</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>gambia_sf <span class="ot">&lt;-</span> gambia_sf <span class="sc">|&gt;</span> </span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">long =</span> <span class="fu">st_coordinates</span>(geometry)[,<span class="dv">1</span>],</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">lat =</span> <span class="fu">st_coordinates</span>(geometry)[,<span class="dv">2</span>]</span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">glimpse</span>(gambia_sf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Rows: 65
+Columns: 7
+$ total      &lt;int&gt; 33, 63, 17, 24, 26, 18, 38, 56, 57, 26, 31, 32, 32, 20, 53,…
+$ positive   &lt;dbl&gt; 17, 19, 7, 8, 10, 7, 24, 7, 6, 8, 6, 12, 14, 5, 5, 4, 8, 15…
+$ prevalence &lt;dbl&gt; 0.51515152, 0.30158730, 0.41176471, 0.33333333, 0.38461538,…
+$ id         &lt;int&gt; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, …
+$ geometry   &lt;POINT [°]&gt; POINT (-16.38755 13.18541), POINT (-16.30543 13.20444…
+$ long       &lt;dbl&gt; -16.38755, -16.30543, -16.28914, -16.25869, -16.23294, -16.…
+$ lat        &lt;dbl&gt; 13.18541, 13.20444, 13.20374, 13.53742, 13.20603, 13.23094,…</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(gambia_sf)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div class="kable-table">
+<table class="table table-sm table-striped small">
+<colgroup>
+<col style="width: 8%">
+<col style="width: 12%">
+<col style="width: 14%">
+<col style="width: 4%">
+<col style="width: 36%">
+<col style="width: 13%">
+<col style="width: 12%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">total</th>
+<th style="text-align: right;">positive</th>
+<th style="text-align: right;">prevalence</th>
+<th style="text-align: right;">id</th>
+<th style="text-align: left;">geometry</th>
+<th style="text-align: right;">long</th>
+<th style="text-align: right;">lat</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">33</td>
+<td style="text-align: right;">17</td>
+<td style="text-align: right;">0.5151515</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">POINT (-16.38755 13.18541)</td>
+<td style="text-align: right;">-16.38755</td>
+<td style="text-align: right;">13.18541</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">63</td>
+<td style="text-align: right;">19</td>
+<td style="text-align: right;">0.3015873</td>
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">POINT (-16.30543 13.20444)</td>
+<td style="text-align: right;">-16.30543</td>
+<td style="text-align: right;">13.20444</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">17</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">0.4117647</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">POINT (-16.28914 13.20374)</td>
+<td style="text-align: right;">-16.28914</td>
+<td style="text-align: right;">13.20374</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">24</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">0.3333333</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: left;">POINT (-16.25869 13.53742)</td>
+<td style="text-align: right;">-16.25869</td>
+<td style="text-align: right;">13.53742</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">26</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">0.3846154</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: left;">POINT (-16.23294 13.20603)</td>
+<td style="text-align: right;">-16.23294</td>
+<td style="text-align: right;">13.20603</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">18</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">0.3888889</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: left;">POINT (-16.23041 13.23094)</td>
+<td style="text-align: right;">-16.23041</td>
+<td style="text-align: right;">13.23094</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>pal <span class="ot">&lt;-</span> <span class="fu">colorBin</span>(<span class="st">"viridis"</span>, <span class="at">bins =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="fl">0.25</span>, <span class="fl">0.5</span>, <span class="fl">0.75</span>, <span class="dv">1</span>))</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="fu">leaflet</span>(gambia_sf) <span class="sc">%&gt;%</span>  <span class="fu">addProviderTiles</span>(providers<span class="sc">$</span>CartoDB.Positron) <span class="sc">%&gt;%</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">addCircles</span>(<span class="at">lng =</span> <span class="sc">~</span>long, <span class="at">lat =</span> <span class="sc">~</span>lat, <span class="at">color =</span> <span class="sc">~</span><span class="fu">pal</span>(prevalence)) <span class="sc">%&gt;%</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>   <span class="fu">addLegend</span>(<span class="st">"bottomright"</span>, <span class="at">pal =</span> pal, <span class="at">values =</span> <span class="sc">~</span>prevalence, <span class="at">title =</span> <span class="st">"Prevalence"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">addScaleBar</span>(<span class="at">position =</span> <span class="fu">c</span>(<span class="st">"bottomleft"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div class="leaflet html-widget html-fill-item" id="htmlwidget-1c0d4adc2ccef94ec7ff" style="width:100%;height:464px;"></div>
+<script type="application/json" data-for="htmlwidget-1c0d4adc2ccef94ec7ff">{"x":{"options":{"crs":{"crsClass":"L.CRS.EPSG3857","code":null,"proj4def":null,"projectedBounds":null,"options":{}}},"calls":[{"method":"addProviderTiles","args":["CartoDB.Positron",null,null,{"errorTileUrl":"","noWrap":false,"detectRetina":false}]},{"method":"addCircles","args":[[13.18540960275872,13.20443727199984,13.2037423480732,13.53742483375246,13.20602626703022,13.23093645511024,13.2090173879772,13.20668051663357,13.56187225369798,13.57833676738091,13.5296475443355,13.19956691943313,13.56615837917601,13.20121983480786,13.49080516225072,13.23172279328361,13.57502985259234,13.57768836934283,13.22815915832426,13.26174450040079,13.23573011986124,13.5645094425938,13.544562690998,13.4839272300477,13.58364505855119,13.59533142632986,13.64513345051705,13.66438213692903,13.60841061653907,13.59916573649856,13.61323576066644,13.54585316636497,13.53404727877061,13.53740820698451,13.46904822831206,13.49588070654694,13.47206173780209,13.49530826232973,13.53770354901038,13.43835539911058,13.34361948948074,13.40531766428903,13.43689830256806,13.37440846660204,13.38294966144942,13.37897944870888,13.30492330079484,13.28587854972034,13.27557094635405,13.41236933660916,13.33465161960916,13.40104924399798,13.30295722063481,13.29422335570695,13.47023367793146,13.37568330151961,13.43754959392746,13.34692748548696,13.35864265618051,13.56534792956765,13.32998993000308,13.41083533432287,13.33403068809915,13.54458671184575,13.33094410109701],[-16.38755103466753,-16.30543023449971,-16.28914083965627,-16.25869081794837,-16.23293684549132,-16.23041347061255,-16.21431238705679,-16.19603975208622,-16.19568557438783,-16.16088152738206,-16.13642095869955,-16.12385873694554,-16.11743240362023,-16.10971410124719,-16.09237076981781,-16.08692886664654,-16.07991433154176,-16.04584649942598,-16.04168810901558,-16.01773510686725,-16.01158288397008,-15.99879345044268,-15.98565368269467,-15.96613192806267,-15.95135065599607,-15.121762326665,-15.10813051265433,-15.06189059265774,-15.06161717065316,-15.03343830781106,-15.03169116719151,-14.97402205561854,-14.94085106711086,-14.92993283045905,-14.86422959449648,-14.85489474135969,-14.83778126548721,-14.83572534541099,-14.81674407459255,-14.78255603216664,-14.33247968917119,-14.27222850455404,-14.24083463017283,-14.21921056818505,-14.21817273092019,-14.20339476006525,-14.15707700512319,-14.12666281465122,-14.12660181855584,-14.12140619921665,-14.11188214475815,-14.08321188477724,-14.07528906357978,-14.06298246105484,-14.05150690098443,-14.03335086165948,-14.03253183613646,-14.02041399715548,-13.98087584463583,-13.97167968025913,-13.95172964019827,-13.94088763464068,-13.94069764932415,-13.89060697551229,-13.87272702640249],10,null,null,{"interactive":true,"className":"","stroke":true,"color":["#35B779","#31688E","#31688E","#31688E","#31688E","#31688E","#35B779","#440154","#440154","#31688E","#440154","#31688E","#31688E","#31688E","#440154","#440154","#31688E","#35B779","#440154","#31688E","#35B779","#31688E","#31688E","#440154","#35B779","#440154","#31688E","#440154","#440154","#440154","#440154","#440154","#440154","#440154","#31688E","#440154","#31688E","#440154","#31688E","#31688E","#31688E","#35B779","#35B779","#31688E","#31688E","#440154","#35B779","#FDE725","#FDE725","#31688E","#35B779","#35B779","#35B779","#35B779","#31688E","#35B779","#31688E","#35B779","#35B779","#FDE725","#35B779","#31688E","#31688E","#FDE725","#31688E"],"weight":5,"opacity":0.5,"fill":true,"fillColor":["#35B779","#31688E","#31688E","#31688E","#31688E","#31688E","#35B779","#440154","#440154","#31688E","#440154","#31688E","#31688E","#31688E","#440154","#440154","#31688E","#35B779","#440154","#31688E","#35B779","#31688E","#31688E","#440154","#35B779","#440154","#31688E","#440154","#440154","#440154","#440154","#440154","#440154","#440154","#31688E","#440154","#31688E","#440154","#31688E","#31688E","#31688E","#35B779","#35B779","#31688E","#31688E","#440154","#35B779","#FDE725","#FDE725","#31688E","#35B779","#35B779","#35B779","#35B779","#31688E","#35B779","#31688E","#35B779","#35B779","#FDE725","#35B779","#31688E","#31688E","#FDE725","#31688E"],"fillOpacity":0.2},null,null,null,{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null,null]},{"method":"addLegend","args":[{"colors":["#440154","#31688E","#35B779","#FDE725"],"labels":["0.00 &ndash; 0.25","0.25 &ndash; 0.50","0.50 &ndash; 0.75","0.75 &ndash; 1.00"],"na_color":null,"na_label":"NA","opacity":0.5,"position":"bottomright","type":"bin","title":"Prevalence","extra":null,"layerId":null,"className":"info legend","group":null}]},{"method":"addScaleBar","args":[{"maxWidth":100,"metric":true,"imperial":true,"updateWhenIdle":true,"position":"bottomleft"}]}],"limits":{"lat":[13.18540960275872,13.66438213692903],"lng":[-16.38755103466753,-13.87272702640249]}},"evals":[],"jsHooks":[]}</script>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(geodata)</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a><span class="co">#3 r &lt;- elevation_30s(country = "GMB", path = tempdir())</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>r <span class="ot">&lt;-</span> <span class="fu">elevation_30s</span>(<span class="st">"GMB"</span>, <span class="at">path =</span> <span class="st">"data/"</span>)</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(r)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="geostatistical_models_files/figure-html/unnamed-chunk-14-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>pal <span class="ot">&lt;-</span> <span class="fu">colorNumeric</span>(<span class="st">"viridis"</span>, <span class="fu">values</span>(r), <span class="at">na.color =</span> <span class="st">"transparent"</span>)</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a><span class="fu">leaflet</span>() <span class="sc">%&gt;%</span> <span class="fu">addProviderTiles</span>(providers<span class="sc">$</span>CartoDB.Positron) <span class="sc">%&gt;%</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">addRasterImage</span>(r, <span class="at">colors =</span> pal, <span class="at">opacity =</span> <span class="fl">0.5</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">addLegend</span>(<span class="st">"bottomright"</span>, <span class="at">pal =</span> pal, <span class="at">values =</span> <span class="fu">values</span>(r), <span class="at">title =</span> <span class="st">"Altitude"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">addScaleBar</span>(<span class="at">position =</span> <span class="fu">c</span>(<span class="st">"bottomleft"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div class="leaflet html-widget html-fill-item" id="htmlwidget-80f78d7406c75c9e4e8d" style="width:100%;height:464px;"></div>
+<script type="application/json" data-for="htmlwidget-80f78d7406c75c9e4e8d">{"x":{"options":{"crs":{"crsClass":"L.CRS.EPSG3857","code":null,"proj4def":null,"projectedBounds":null,"options":{}}},"calls":[{"method":"addProviderTiles","args":["CartoDB.Positron",null,null,{"errorTileUrl":"","noWrap":false,"detectRetina":false}]},{"method":"addRasterImage","args":["data:image/png;base64,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",[[13.99999999999999,-17],[12.9,-13.6]],null,null,{"tileSize":256,"zIndex":1,"minZoom":0,"opacity":0.5}]},{"method":"addLegend","args":[{"colors":["#440154 , #471265 4.54545454545455%, #414287 19.6969696969697%, #2F6C8E 34.8484848484849%, #21908D 50%, #2FB47C 65.1515151515152%, #7CD250 80.3030303030303%, #E0E318 95.4545454545455%, #FDE725 "],"labels":["0","10","20","30","40","50","60"],"na_color":null,"na_label":"NA","opacity":0.5,"position":"bottomright","type":"numeric","title":"Altitude","extra":{"p_1":0.04545454545454546,"p_n":0.9545454545454546},"layerId":null,"className":"info legend","group":null}]},{"method":"addScaleBar","args":[{"maxWidth":100,"metric":true,"imperial":true,"updateWhenIdle":true,"position":"bottomleft"}]}],"limits":{"lat":[12.9,13.99999999999999],"lng":[-17,-13.6]}},"evals":[],"jsHooks":[]}</script>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>gambia_sf <span class="ot">&lt;-</span> gambia_sf <span class="sc">|&gt;</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">alt =</span> terra<span class="sc">::</span><span class="fu">extract</span>(r, <span class="fu">vect</span>(gambia_sf))[,<span class="dv">2</span>])</span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>gambia_sf <span class="ot">&lt;-</span> gambia_sf <span class="sc">|&gt;</span> <span class="fu">drop_na</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(gambia_sf) <span class="sc">+</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> gm_sf)<span class="sc">+</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">color =</span> prevalence, <span class="at">size =</span> alt)) <span class="sc">+</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_viridis_c</span>() <span class="sc">+</span></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="geostatistical_models_files/figure-html/unnamed-chunk-17-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<section id="build-mesh" class="level3">
+<h3 class="anchored" data-anchor-id="build-mesh">Build Mesh</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(INLA)</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>coords <span class="ot">&lt;-</span> <span class="fu">st_coordinates</span>(gambia_sf)</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>mesh <span class="ot">&lt;-</span> <span class="fu">inla.mesh.2d</span>(<span class="at">loc =</span> coords, <span class="at">max.edge =</span> <span class="fu">c</span>(<span class="fl">0.1</span>,<span class="dv">5</span>),<span class="at">cutoff =</span> <span class="fl">0.01</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>mesh<span class="sc">$</span>n</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 665</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(mesh)</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="fu">points</span>(coords,<span class="at">col =</span> <span class="st">"red"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="geostatistical_models_files/figure-html/unnamed-chunk-19-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(mesh)</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a><span class="fu">points</span>(coords, <span class="at">col =</span> <span class="st">"red"</span>, <span class="at">pch =</span> <span class="dv">19</span>, <span class="at">cex =</span> <span class="fl">0.5</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="geostatistical_models_files/figure-html/unnamed-chunk-20-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="build-the-spde-model-on-the-mesh" class="level3">
+<h3 class="anchored" data-anchor-id="build-the-spde-model-on-the-mesh">Build the SPDE model on the mesh</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>spde <span class="ot">&lt;-</span> <span class="fu">inla.spde2.matern</span>(<span class="at">mesh =</span> mesh, <span class="at">alpha =</span> <span class="dv">2</span>)</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>A <span class="ot">&lt;-</span> <span class="fu">inla.spde.make.A</span>(<span class="at">mesh =</span> mesh, <span class="at">loc =</span> coords)  <span class="co"># projector matrix</span></span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>s.index <span class="ot">&lt;-</span> <span class="fu">inla.spde.make.index</span>(<span class="st">"spatial"</span>, spde<span class="sc">$</span>n.spde)</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>formula <span class="ot">&lt;-</span> Y <span class="sc">~</span> <span class="dv">1</span> <span class="sc">+</span> altitude <span class="sc">+</span> <span class="fu">f</span>(spatial, <span class="at">model =</span> spde)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>stack <span class="ot">&lt;-</span> <span class="fu">inla.stack</span>(</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> <span class="fu">list</span>(<span class="at">y =</span> gambia_sf<span class="sc">$</span>positive, <span class="at">Ntrials =</span> gambia_sf<span class="sc">$</span>total),</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">A =</span> <span class="fu">list</span>(<span class="dv">1</span>, A),</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">effects =</span> <span class="fu">list</span>(</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">data.frame</span>(<span class="at">intercept =</span> <span class="dv">1</span>, <span class="at">altitude =</span> gambia_sf<span class="sc">$</span>alt),</span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">spatial =</span> s.index<span class="sc">$</span>spatial</span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">tag =</span> <span class="st">"est"</span></span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>formula <span class="ot">&lt;-</span> y <span class="sc">~</span> <span class="dv">0</span> <span class="sc">+</span> intercept <span class="sc">+</span> altitude <span class="sc">+</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">f</span>(spatial, <span class="at">model =</span> spde)</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">inla</span>(</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>  formula,</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">family =</span> <span class="st">"binomial"</span>,</span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">Ntrials =</span> <span class="fu">inla.stack.data</span>(stack)<span class="sc">$</span>Ntrials,</span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> <span class="fu">inla.stack.data</span>(stack),</span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">control.predictor =</span> <span class="fu">list</span>(<span class="at">A =</span> <span class="fu">inla.stack.A</span>(stack), <span class="at">compute =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">control.compute =</span> <span class="fu">list</span>(<span class="at">dic =</span> <span class="cn">TRUE</span>, <span class="at">waic =</span> <span class="cn">TRUE</span>, <span class="at">cpo =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(result)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Time used:
+    Pre = 2.2, Running = 0.812, Post = 0.281, Total = 3.29 
+Fixed effects:
+            mean    sd 0.025quant 0.5quant 0.975quant   mode kld
+intercept -0.626 0.439     -1.415   -0.652      0.331 -0.714   0
+altitude   0.000 0.012     -0.024    0.000      0.024  0.000   0
+
+Random effects:
+  Name    Model
+    spatial SPDE2 model
+
+Model hyperparameters:
+                    mean    sd 0.025quant 0.5quant 0.975quant  mode
+Theta1 for spatial -4.22 0.373      -4.96    -4.22      -3.49 -4.22
+Theta2 for spatial  3.00 0.413       2.18     3.00       3.81  3.00
+
+Deviance Information Criterion (DIC) ...............: 336.24
+Deviance Information Criterion (DIC, saturated) ....: 118.48
+Effective number of parameters .....................: 44.10
+
+Watanabe-Akaike information criterion (WAIC) ...: 339.34
+Effective number of parameters .................: 34.47
+
+Marginal log-Likelihood:  -210.04 
+CPO, PIT is computed 
+Posterior summaries for the linear predictor and the fitted values are computed
+(Posterior marginals needs also 'control.compute=list(return.marginals.predictor=TRUE)')</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>gambia_boundary <span class="ot">&lt;-</span> <span class="fu">st_as_sf</span>(gambia.borders <span class="sc">|&gt;</span> <span class="fu">drop_na</span>(),<span class="at">coords =</span> <span class="fu">c</span>(<span class="st">"x"</span>, <span class="st">"y"</span>),<span class="at">crs =</span> <span class="dv">32628</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_transform</span>(<span class="dv">4326</span>) </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(gm_sf)<span class="sc">+</span></span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="geostatistical_models_files/figure-html/unnamed-chunk-25-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>gambia_boundary <span class="ot">&lt;-</span> gm_sf</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a><span class="co"># Create a regular prediction grid inside boundary</span></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>pred_grid <span class="ot">&lt;-</span> <span class="fu">st_make_grid</span>(gambia_boundary, <span class="at">cellsize =</span> <span class="fl">0.05</span>, <span class="at">square =</span> <span class="cn">TRUE</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_intersection</span>(gambia_boundary)</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert to points (centroids)</span></span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>pred_points <span class="ot">&lt;-</span> <span class="fu">st_centroid</span>(pred_grid)</span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>coords_pred <span class="ot">&lt;-</span> <span class="fu">st_coordinates</span>(pred_points)</span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a>A_pred <span class="ot">&lt;-</span> <span class="fu">inla.spde.make.A</span>(<span class="at">mesh =</span> mesh, <span class="at">loc =</span> coords_pred)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>stack_pred <span class="ot">&lt;-</span> <span class="fu">inla.stack</span>(</span>
+<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> <span class="fu">list</span>(<span class="at">y =</span> <span class="cn">NA</span>, <span class="at">Ntrials =</span> <span class="cn">NA</span>),</span>
+<span id="cb35-3"><a href="#cb35-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">A =</span> <span class="fu">list</span>(<span class="dv">1</span>, A_pred),</span>
+<span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">effects =</span> <span class="fu">list</span>(</span>
+<span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">data.frame</span>(<span class="at">intercept =</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">nrow</span>(coords_pred)),</span>
+<span id="cb35-6"><a href="#cb35-6" aria-hidden="true" tabindex="-1"></a>               <span class="at">altitude =</span> <span class="fu">rep</span>(<span class="fu">mean</span>(gambia_sf<span class="sc">$</span>alt, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), </span>
+<span id="cb35-7"><a href="#cb35-7" aria-hidden="true" tabindex="-1"></a>                              <span class="fu">nrow</span>(coords_pred))),  <span class="co"># or extract real altitude if available</span></span>
+<span id="cb35-8"><a href="#cb35-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">spatial =</span> s.index<span class="sc">$</span>spatial</span>
+<span id="cb35-9"><a href="#cb35-9" aria-hidden="true" tabindex="-1"></a>  ),</span>
+<span id="cb35-10"><a href="#cb35-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">tag =</span> <span class="st">"pred"</span></span>
+<span id="cb35-11"><a href="#cb35-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb35-12"><a href="#cb35-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb35-13"><a href="#cb35-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Combine with estimation stack</span></span>
+<span id="cb35-14"><a href="#cb35-14" aria-hidden="true" tabindex="-1"></a>stack_full <span class="ot">&lt;-</span> <span class="fu">inla.stack</span>(stack, stack_pred)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">inla</span>(</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>  formula,</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">family =</span> <span class="st">"binomial"</span>,</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">Ntrials =</span> <span class="fu">inla.stack.data</span>(stack_full)<span class="sc">$</span>Ntrials,</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> <span class="fu">inla.stack.data</span>(stack_full),</span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">control.predictor =</span> <span class="fu">list</span>(<span class="at">A =</span> <span class="fu">inla.stack.A</span>(stack_full), <span class="at">compute =</span> <span class="cn">TRUE</span>),</span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">control.compute =</span> <span class="fu">list</span>(<span class="at">dic =</span> <span class="cn">TRUE</span>, <span class="at">waic =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>index_pred <span class="ot">&lt;-</span> <span class="fu">inla.stack.index</span>(stack_full, <span class="st">"pred"</span>)<span class="sc">$</span>data</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>pred_mean <span class="ot">&lt;-</span> result<span class="sc">$</span>summary.fitted.values[index_pred, <span class="st">"mean"</span>]</span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>pred_sd   <span class="ot">&lt;-</span> result<span class="sc">$</span>summary.fitted.values[index_pred, <span class="st">"sd"</span>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Get coordinates safely (each geometry is a POINT)</span></span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>coords <span class="ot">&lt;-</span> <span class="fu">do.call</span>(rbind, <span class="fu">lapply</span>(<span class="fu">st_geometry</span>(pred_points), <span class="cf">function</span>(pt) <span class="fu">unlist</span>(pt)))</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Build clean data.frame</span></span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>pred_df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">X =</span> coords[,<span class="dv">1</span>],</span>
+<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">Y =</span> coords[,<span class="dv">2</span>],</span>
+<span id="cb38-8"><a href="#cb38-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">mean =</span> <span class="fu">as.numeric</span>(pred_mean),</span>
+<span id="cb38-9"><a href="#cb38-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">sd   =</span> <span class="fu">as.numeric</span>(pred_sd)</span>
+<span id="cb38-10"><a href="#cb38-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb38-11"><a href="#cb38-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-12"><a href="#cb38-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Rebuild sf object</span></span>
+<span id="cb38-13"><a href="#cb38-13" aria-hidden="true" tabindex="-1"></a>pred_points <span class="ot">&lt;-</span> <span class="fu">st_as_sf</span>(pred_df, <span class="at">coords =</span> <span class="fu">c</span>(<span class="st">"X"</span>, <span class="st">"Y"</span>), <span class="at">crs =</span> <span class="dv">4326</span>)</span>
+<span id="cb38-14"><a href="#cb38-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-15"><a href="#cb38-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Add prevalence (logit^-1 of mean)</span></span>
+<span id="cb38-16"><a href="#cb38-16" aria-hidden="true" tabindex="-1"></a>pred_points<span class="sc">$</span>prevalence <span class="ot">&lt;-</span> <span class="fu">plogis</span>(pred_points<span class="sc">$</span>mean)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb39-4"><a href="#cb39-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> gambia_boundary, <span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">color =</span> <span class="st">"black"</span>) <span class="sc">+</span></span>
+<span id="cb39-5"><a href="#cb39-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> pred_points, <span class="fu">aes</span>(<span class="at">color =</span> mean), <span class="at">size =</span> <span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb39-6"><a href="#cb39-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_viridis_c</span>(<span class="at">name =</span> <span class="st">"Prevalence"</span>) <span class="sc">+</span></span>
+<span id="cb39-7"><a href="#cb39-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb39-8"><a href="#cb39-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Predicted Prevalence of Infection in The Gambia (INLA-SPDE)"</span>,</span>
+<span id="cb39-9"><a href="#cb39-9" aria-hidden="true" tabindex="-1"></a>       <span class="at">subtitle =</span> <span class="st">"Posterior mean from spatial binomial model"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="geostatistical_models_files/figure-html/unnamed-chunk-31-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> gambia_boundary, <span class="at">fill =</span> <span class="cn">NA</span>, <span class="at">color =</span> <span class="st">"black"</span>) <span class="sc">+</span></span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="at">data =</span> pred_points, <span class="fu">aes</span>(<span class="at">color =</span> prevalence), <span class="at">size =</span> <span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_viridis_c</span>(<span class="at">name =</span> <span class="st">"Prevalence (0–1)"</span>, <span class="at">limits =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">1</span>)) <span class="sc">+</span></span>
+<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb40-6"><a href="#cb40-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb40-7"><a href="#cb40-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Predicted Prevalence of Infection in The Gambia (INLA-SPDE)"</span>,</span>
+<span id="cb40-8"><a href="#cb40-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"Posterior mean prevalence (probability scale)"</span></span>
+<span id="cb40-9"><a href="#cb40-9" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="geostatistical_models_files/figure-html/unnamed-chunk-32-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Build projector for mesh onto grid</span></span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>proj <span class="ot">&lt;-</span> <span class="fu">inla.mesh.projector</span>(mesh, </span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>                            <span class="at">xlim =</span> <span class="fu">st_bbox</span>(gambia_boundary)[<span class="fu">c</span>(<span class="st">"xmin"</span>,<span class="st">"xmax"</span>)],</span>
+<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a>                            <span class="at">ylim =</span> <span class="fu">st_bbox</span>(gambia_boundary)[<span class="fu">c</span>(<span class="st">"ymin"</span>,<span class="st">"ymax"</span>)],</span>
+<span id="cb41-5"><a href="#cb41-5" aria-hidden="true" tabindex="-1"></a>                            <span class="at">dims =</span> <span class="fu">c</span>(<span class="dv">200</span>, <span class="dv">200</span>))  <span class="co"># resolution of the grid</span></span>
+<span id="cb41-6"><a href="#cb41-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-7"><a href="#cb41-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Project posterior mean</span></span>
+<span id="cb41-8"><a href="#cb41-8" aria-hidden="true" tabindex="-1"></a>proj_mean <span class="ot">&lt;-</span> <span class="fu">inla.mesh.project</span>(proj, result<span class="sc">$</span>summary.random<span class="sc">$</span>spatial<span class="sc">$</span>mean)</span>
+<span id="cb41-9"><a href="#cb41-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-10"><a href="#cb41-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert to raster</span></span>
+<span id="cb41-11"><a href="#cb41-11" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(raster)</span>
+<span id="cb41-12"><a href="#cb41-12" aria-hidden="true" tabindex="-1"></a>r <span class="ot">&lt;-</span> <span class="fu">raster</span>(<span class="fu">list</span>(<span class="at">x =</span> proj<span class="sc">$</span>x, <span class="at">y =</span> proj<span class="sc">$</span>y, <span class="at">z =</span> proj_mean))</span>
+<span id="cb41-13"><a href="#cb41-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-14"><a href="#cb41-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Mask with Gambia boundary</span></span>
+<span id="cb41-15"><a href="#cb41-15" aria-hidden="true" tabindex="-1"></a>r_masked <span class="ot">&lt;-</span> <span class="fu">mask</span>(r, <span class="fu">as</span>(gambia_boundary, <span class="st">"Spatial"</span>))</span>
+<span id="cb41-16"><a href="#cb41-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb41-17"><a href="#cb41-17" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot</span></span>
+<span id="cb41-18"><a href="#cb41-18" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(r_masked, <span class="at">main =</span> <span class="st">"Predicted Prevalence (INLA-SPDE)"</span>, <span class="at">col =</span> viridis<span class="sc">::</span><span class="fu">viridis</span>(<span class="dv">100</span>))</span>
+<span id="cb41-19"><a href="#cb41-19" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(<span class="fu">st_geometry</span>(gambia_boundary), <span class="at">add =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="geostatistical_models_files/figure-html/unnamed-chunk-33-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Project posterior mean onto the grid</span></span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>proj_mean <span class="ot">&lt;-</span> <span class="fu">inla.mesh.project</span>(proj, result<span class="sc">$</span>summary.random<span class="sc">$</span>spatial<span class="sc">$</span>mean)</span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert logit-scale to probability scale</span></span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a>proj_prev <span class="ot">&lt;-</span> <span class="fu">plogis</span>(proj_mean)</span>
+<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Build raster</span></span>
+<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a>r_prev <span class="ot">&lt;-</span> <span class="fu">raster</span>(<span class="fu">list</span>(<span class="at">x =</span> proj<span class="sc">$</span>x, <span class="at">y =</span> proj<span class="sc">$</span>y, <span class="at">z =</span> proj_prev))</span>
+<span id="cb42-9"><a href="#cb42-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-10"><a href="#cb42-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Mask with Gambia boundary</span></span>
+<span id="cb42-11"><a href="#cb42-11" aria-hidden="true" tabindex="-1"></a>r_prev_masked <span class="ot">&lt;-</span> <span class="fu">mask</span>(r_prev, <span class="fu">as</span>(gambia_boundary, <span class="st">"Spatial"</span>))</span>
+<span id="cb42-12"><a href="#cb42-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb42-13"><a href="#cb42-13" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot prevalence</span></span>
+<span id="cb42-14"><a href="#cb42-14" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(r_prev_masked,</span>
+<span id="cb42-15"><a href="#cb42-15" aria-hidden="true" tabindex="-1"></a>     <span class="at">main =</span> <span class="st">"Predicted Prevalence (0–1 scale, INLA-SPDE)"</span>,</span>
+<span id="cb42-16"><a href="#cb42-16" aria-hidden="true" tabindex="-1"></a>     <span class="at">col =</span> viridis<span class="sc">::</span><span class="fu">viridis</span>(<span class="dv">100</span>))</span>
+<span id="cb42-17"><a href="#cb42-17" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(<span class="fu">st_geometry</span>(gambia_boundary), <span class="at">add =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="geostatistical_models_files/figure-html/unnamed-chunk-34-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(viridis)</span>
+<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>proj_sd <span class="ot">&lt;-</span> <span class="fu">inla.mesh.project</span>(proj, result<span class="sc">$</span>summary.random<span class="sc">$</span>spatial<span class="sc">$</span>sd)</span>
+<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>r_sd <span class="ot">&lt;-</span> <span class="fu">raster</span>(<span class="fu">list</span>(<span class="at">x =</span> proj<span class="sc">$</span>x, <span class="at">y =</span> proj<span class="sc">$</span>y, <span class="at">z =</span> proj_sd))</span>
+<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a>r_sd_masked <span class="ot">&lt;-</span> <span class="fu">mask</span>(r_sd, <span class="fu">as</span>(gambia_boundary, <span class="st">"Spatial"</span>))</span>
+<span id="cb43-5"><a href="#cb43-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb43-6"><a href="#cb43-6" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(r_sd_masked,</span>
+<span id="cb43-7"><a href="#cb43-7" aria-hidden="true" tabindex="-1"></a>     <span class="at">main =</span> <span class="st">"Posterior Uncertainty (SD of Prevalence)"</span>,</span>
+<span id="cb43-8"><a href="#cb43-8" aria-hidden="true" tabindex="-1"></a>     <span class="at">col =</span> viridis<span class="sc">::</span><span class="fu">viridis</span>(<span class="dv">100</span>))</span>
+<span id="cb43-9"><a href="#cb43-9" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(<span class="fu">st_geometry</span>(gambia_boundary), <span class="at">add =</span> <span class="cn">TRUE</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="geostatistical_models_files/figure-html/unnamed-chunk-35-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Build a projector for a regular grid covering Gambia</span></span>
+<span id="cb44-2"><a href="#cb44-2" aria-hidden="true" tabindex="-1"></a>bb <span class="ot">&lt;-</span> <span class="fu">st_bbox</span>(gambia_boundary)</span>
+<span id="cb44-3"><a href="#cb44-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-4"><a href="#cb44-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Build projector</span></span>
+<span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a>proj <span class="ot">&lt;-</span> <span class="fu">inla.mesh.projector</span>(</span>
+<span id="cb44-6"><a href="#cb44-6" aria-hidden="true" tabindex="-1"></a>  mesh,</span>
+<span id="cb44-7"><a href="#cb44-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">xlim =</span> <span class="fu">c</span>(bb[<span class="st">"xmin"</span>], bb[<span class="st">"xmax"</span>]),</span>
+<span id="cb44-8"><a href="#cb44-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">ylim =</span> <span class="fu">c</span>(bb[<span class="st">"ymin"</span>], bb[<span class="st">"ymax"</span>]),</span>
+<span id="cb44-9"><a href="#cb44-9" aria-hidden="true" tabindex="-1"></a>  <span class="at">dims =</span> <span class="fu">c</span>(<span class="dv">200</span>, <span class="dv">200</span>)  <span class="co"># grid resolution</span></span>
+<span id="cb44-10"><a href="#cb44-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb44-11"><a href="#cb44-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-12"><a href="#cb44-12" aria-hidden="true" tabindex="-1"></a><span class="co"># Project fitted values from mesh onto raster grid</span></span>
+<span id="cb44-13"><a href="#cb44-13" aria-hidden="true" tabindex="-1"></a>proj_mean <span class="ot">&lt;-</span> <span class="fu">inla.mesh.project</span>(proj, result<span class="sc">$</span>summary.random<span class="sc">$</span>spatial<span class="sc">$</span>mean)</span>
+<span id="cb44-14"><a href="#cb44-14" aria-hidden="true" tabindex="-1"></a>proj_sd   <span class="ot">&lt;-</span> <span class="fu">inla.mesh.project</span>(proj, result<span class="sc">$</span>summary.random<span class="sc">$</span>spatial<span class="sc">$</span>sd)</span>
+<span id="cb44-15"><a href="#cb44-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-16"><a href="#cb44-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Turn into raster</span></span>
+<span id="cb44-17"><a href="#cb44-17" aria-hidden="true" tabindex="-1"></a>r_mean <span class="ot">&lt;-</span> <span class="fu">raster</span>(<span class="fu">list</span>(<span class="at">x =</span> proj<span class="sc">$</span>x, <span class="at">y =</span> proj<span class="sc">$</span>y, <span class="at">z =</span> proj_mean))</span>
+<span id="cb44-18"><a href="#cb44-18" aria-hidden="true" tabindex="-1"></a>r_sd   <span class="ot">&lt;-</span> <span class="fu">raster</span>(<span class="fu">list</span>(<span class="at">x =</span> proj<span class="sc">$</span>x, <span class="at">y =</span> proj<span class="sc">$</span>y, <span class="at">z =</span> proj_sd))</span>
+<span id="cb44-19"><a href="#cb44-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-20"><a href="#cb44-20" aria-hidden="true" tabindex="-1"></a><span class="co"># Mask to Gambia boundary</span></span>
+<span id="cb44-21"><a href="#cb44-21" aria-hidden="true" tabindex="-1"></a>r_mean_masked <span class="ot">&lt;-</span> <span class="fu">mask</span>(r_mean, <span class="fu">as</span>(gambia_boundary, <span class="st">"Spatial"</span>))</span>
+<span id="cb44-22"><a href="#cb44-22" aria-hidden="true" tabindex="-1"></a>r_sd_masked   <span class="ot">&lt;-</span> <span class="fu">mask</span>(r_sd, <span class="fu">as</span>(gambia_boundary, <span class="st">"Spatial"</span>))</span>
+<span id="cb44-23"><a href="#cb44-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-24"><a href="#cb44-24" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert mean to probability scale</span></span>
+<span id="cb44-25"><a href="#cb44-25" aria-hidden="true" tabindex="-1"></a>r_mean_masked <span class="ot">&lt;-</span> <span class="fu">calc</span>(r_mean_masked, plogis)</span>
+<span id="cb44-26"><a href="#cb44-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-27"><a href="#cb44-27" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot</span></span>
+<span id="cb44-28"><a href="#cb44-28" aria-hidden="true" tabindex="-1"></a>p1 <span class="ot">&lt;-</span> rasterVis<span class="sc">::</span><span class="fu">levelplot</span>(r_mean_masked,</span>
+<span id="cb44-29"><a href="#cb44-29" aria-hidden="true" tabindex="-1"></a>        <span class="at">margin =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb44-30"><a href="#cb44-30" aria-hidden="true" tabindex="-1"></a>        <span class="at">col.regions =</span> <span class="fu">viridis</span>(<span class="dv">100</span>),</span>
+<span id="cb44-31"><a href="#cb44-31" aria-hidden="true" tabindex="-1"></a>        <span class="at">main =</span> <span class="st">"Posterior Mean Prevalence (0–1 scale)"</span>) <span class="sc">+</span></span>
+<span id="cb44-32"><a href="#cb44-32" aria-hidden="true" tabindex="-1"></a>        latticeExtra<span class="sc">::</span><span class="fu">layer</span>(<span class="fu">sp.lines</span>(<span class="fu">as</span>(gambia_boundary, <span class="st">"Spatial"</span>), <span class="at">col=</span><span class="st">"black"</span>))</span>
+<span id="cb44-33"><a href="#cb44-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-34"><a href="#cb44-34" aria-hidden="true" tabindex="-1"></a>p2 <span class="ot">&lt;-</span> rasterVis<span class="sc">::</span><span class="fu">levelplot</span>(r_sd_masked,</span>
+<span id="cb44-35"><a href="#cb44-35" aria-hidden="true" tabindex="-1"></a>        <span class="at">margin =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb44-36"><a href="#cb44-36" aria-hidden="true" tabindex="-1"></a>        <span class="at">col.regions =</span> <span class="fu">viridis</span>(<span class="dv">100</span>),</span>
+<span id="cb44-37"><a href="#cb44-37" aria-hidden="true" tabindex="-1"></a>        <span class="at">main =</span> <span class="st">"Posterior Uncertainty (SD)"</span>) <span class="sc">+</span></span>
+<span id="cb44-38"><a href="#cb44-38" aria-hidden="true" tabindex="-1"></a>        latticeExtra<span class="sc">::</span><span class="fu">layer</span>(<span class="fu">sp.lines</span>(<span class="fu">as</span>(gambia_boundary, <span class="st">"Spatial"</span>), <span class="at">col=</span><span class="st">"black"</span>))</span>
+<span id="cb44-39"><a href="#cb44-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb44-40"><a href="#cb44-40" aria-hidden="true" tabindex="-1"></a>gridExtra<span class="sc">::</span><span class="fu">grid.arrange</span>(p1, p2, <span class="at">ncol =</span> <span class="dv">2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="geostatistical_models_files/figure-html/unnamed-chunk-36-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

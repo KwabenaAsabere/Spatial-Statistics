@@ -1,0 +1,53 @@
+<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
+<qgis version="3.24.3-Tisler">
+  <identifier>Ghana_Shapefile_(New)</identifier>
+  <parentidentifier></parentidentifier>
+  <language>ENG</language>
+  <type>dataset</type>
+  <title>Ghana_Shapefile_(New)</title>
+  <abstract>This data is created for the purposes of accomplishing a project that needed to consider the newly approved Ghana Regions. Itis to assist mapping of the locations of Queen mothers in Ghana.As the time this data was created, there has not been any authorized shapefile of the new Ghana regions from Lands Commission or Ghana Statistical Service. This data was created from the old authorized Ghana districts shapefiles using the district boundary. So it has the same spatial resolution as the old Ghana Regions shapefile just that the newregional boundaries have be added using the already existing boundaries of the districts. The creators of this shapefile did not create this shapefile by digitizing but by geoprocessing exising authorized Ghana District shapefile.
+
+This data was created for the purposes of accomplishing a project that needed to consider the newly approved Ghana Regions. It is to assist mapping the locations of Queen Mothers in Ghana.</abstract>
+  <keywords vocabulary="Search keys">
+    <keyword>Ghana</keyword>
+    <keyword>New regions</keyword>
+  </keywords>
+  <contact>
+    <name></name>
+    <organization></organization>
+    <position></position>
+    <voice></voice>
+    <fax></fax>
+    <email></email>
+    <role></role>
+  </contact>
+  <links/>
+  <fees></fees>
+  <constraints type="Limitations of use">This Data is not authorized by any government or private institution. It was created from the old authorized Ghana Shapefile using the district boundaries. Any one who uses this for any analysis should note this. Any limitations from the old authorized shapefile are inherited by this shapefile.</constraints>
+  <rights>Where Geospatial Media&#xd;
+www.wheregeospatial.com&#xd;
+blog.wheregeospatial.com</rights>
+  <encoding></encoding>
+  <crs>
+    <spatialrefsys nativeFormat="Wkt">
+      <wkt></wkt>
+      <proj4></proj4>
+      <srsid>0</srsid>
+      <srid>0</srid>
+      <authid></authid>
+      <description></description>
+      <projectionacronym></projectionacronym>
+      <ellipsoidacronym></ellipsoidacronym>
+      <geographicflag>false</geographicflag>
+    </spatialrefsys>
+  </crs>
+  <extent>
+    <spatial minz="0" dimensions="2" maxx="1.2291780000000001" miny="4.73315199999999958" maxy="11.17307199999999945" crs="EPSG:4326" maxz="0" minx="-3.29035900000000003"/>
+    <temporal>
+      <period>
+        <start>2019-04-26T00:00:00Z</start>
+        <end></end>
+      </period>
+    </temporal>
+  </extent>
+</qgis>

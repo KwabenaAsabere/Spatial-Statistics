@@ -1,0 +1,264 @@
+---
+title: "MALARIA PREVALENCE IN GAMBIA"
+author: "K.Asabere"
+format:
+  html:
+    embed-resources: true
+    self-contained: true
+editor: visual
+df-print: kable
+code-overflow: wrap
+execute: 
+  echo: true
+  warning: false
+  message: false
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(sf)
+library(spdep)
+library(terra)
+library(tmap)
+library(SpatialEpi)
+library(INLA)
+library(leaflet)
+library(viridis)
+library(finalfit)
+theme_set(theme_bw())
+```
+
+```{r}
+gambia_sf <- read_rds("gambia_sf.rds")
+gm_sf <- read_rds("gambia_map.rds")
+```
+
+```{r}
+head(gambia_sf)
+glimpse(gambia_sf)
+missing_glimpse(gambia_sf)
+```
+
+```{r}
+# Reproject Gambia survey data to UTM zone 28N, extract point coordinates, 
+# and build a 2D INLA mesh over the study area with specified edge lengths and cutoff distance.  
+
+
+gambia_sf_utm <- st_transform(gambia_sf, 32628)
+coords <- st_coordinates(gambia_sf_utm)
+
+mesh <- inla.mesh.2d(loc = coords, max.edge = c(5000, 20000), cutoff = 1000)
+```
+
+```{r}
+mesh$n
+plot(mesh)
+points(coords, col = "red")
+```
+
+```{r}
+# Define the SPDE model with a Matérn covariance, create spatial index mappings for the mesh nodes, 
+# and build the A matrix linking survey locations to the spatial field.  
+
+spde <- inla.spde2.matern(mesh = mesh, alpha = 2)
+
+s.index <- inla.spde.make.index("spatial", spde$n.spde)
+lengths(s.index)
+
+A <- inla.spde.make.A(mesh = mesh, loc = coords)
+```
+
+```{r}
+## extract elevation data
+library(geodata)
+
+r <- elevation_30s("GMB", path = "data/")
+dp <- as.points(r)
+dim(dp)
+```
+
+```{r}
+# Load the saved Gambia raster object from RDS, 
+# unwrap it (convert wrapped longitude values into continuous coordinates),
+# and plot the raster to visually inspect the spatial data.
+
+gambia_raster <- read_rds("gambia_raster.rds")
+gambia_raster <- unwrap(gambia_raster)
+plot(gambia_raster)
+
+```
+
+```{r}
+# then aggregate the raster (r) to a coarser resolution by a factor of 5 
+# using the mean function,
+# convert the aggregated raster to point features (dp)
+
+dim(dp)
+ra <- aggregate(r, fact = 5, fun = mean)
+dp <- as.points(ra)
+dim(dp)
+dp
+```
+
+```{r}
+# Extract the x and y coordinate columns from the geometry of the point dataset (dp)
+
+coop <- geom(dp)[, c("x", "y")]
+class(coop)
+
+```
+
+```{r}
+dp_df <- cbind(as.data.frame(dp), geom(dp)[, c("x", "y")])
+head(dp_df)
+```
+
+```{r}
+# Construct the sparse projection (A) matrix that links the mesh nodes 
+# to the observation locations (coop
+
+Ap <- inla.spde.make.A(mesh = mesh, loc = coop)
+```
+
+```{r}
+# Build an INLA stack (stk.e) that combines outcome data, covariates, and the spatial random effect linked via the projection matrix for model estimation.
+
+
+stk.e <- inla.stack(
+    tag = "est",
+    data = list(y = gambia_sf$positive, Ntrials = gambia_sf$total),
+    A = list(1, A),
+    effects = list(
+        data.frame(intercept = 1, altitude = gambia_sf$alt),
+        spatial = s.index$spatial
+    )
+)
+```
+
+```{r}
+# Build an INLA stack (stack_pred) for prediction by combining new covariates, missing outcomes, and the spatial random effect linked through the projection matrix.  
+
+stack_pred <- inla.stack(
+    tag = "pred",
+    data = list(y = NA, Ntrials = NA),
+    A = list(1, Ap),
+    effects = list(
+        data.frame(intercept = 1, altitude = dp_df$GMB_elv_msk),
+        spatial = s.index$spatial
+    )
+)
+```
+
+```{r}
+
+# Combine the estimation and prediction stacks into a single stack for model fitting
+stack_full <- inla.stack(stk.e, stack_pred)
+
+# Define the INLA model formula with fixed effects (intercept, altitude) and a spatial random effect using the SPDE model
+formula <- y ~ 0 + intercept + altitude + f(spatial, model = spde)
+
+```
+
+```{r}
+# Fit a Bayesian spatial binomial regression model with a logit link in INLA, using the combined estimation and prediction stacks.  
+
+res <- inla(
+    formula,
+    family = "binomial",
+    Ntrials = Ntrials,
+    control.family = list(link = "logit"),
+    data = inla.stack.data(stack_full),
+    control.predictor = list(
+        compute = TRUE,
+        link = 1,
+        A = inla.stack.A(stack_full)
+    )
+)
+```
+
+```{r}
+summary(res)
+
+```
+
+```{r}
+# Extract the row indices from the full INLA stack corresponding to the prediction data (tag = "pred").  
+
+index <- inla.stack.index(stack = stack_full, tag = "pred")$data
+```
+
+```{r}
+# Extract posterior mean and 95% credible interval (lower and upper quantiles) of predicted prevalence from the fitted INLA model.  
+
+prev_mean <- res$summary.fitted.values[index, "mean"]
+prev_ll <- res$summary.fitted.values[index, "0.025quant"]
+prev_ul <- res$summary.fitted.values[index, "0.975quant"]
+```
+
+```{r}
+# Create a tibble of prediction results by combining coordinates (x, y) with the posterior mean and 95% credible interval bounds (LL, UL) of predicted prevalence.  
+
+pred_df <- tibble(
+    x = coop[, 1],
+    y = coop[, 2],
+    prev_mean = prev_mean,
+    LL = prev_ll,
+    UL = prev_ul
+)
+
+head(pred_df)
+```
+
+```{r}
+# Convert the prediction tibble into a spatial vector object (with WGS84 CRS) and plot the predicted prevalence surface.  
+
+pred_vect = vect(pred_df, geom = c("x", "y"), crs = "EPSG:4326")
+plot(pred_vect)
+```
+
+```{r}
+# Rasterize the predicted mean prevalence values onto the template raster (ra) and plot the resulting prevalence map.  
+
+r_prev_mean = rasterize(x = pred_vect, y = ra, field = "prev_mean", fun = mean)
+r_prev_mean
+plot(r_prev_mean)
+```
+
+```{r}
+# Rasterize the lower bound (2.5% quantile) of predicted prevalence onto the template raster and plot the map.  
+
+r_LL <- rasterize(x = pred_vect, y = ra, field = "LL", fun = mean)
+plot(r_LL)
+
+```
+
+```{r}
+# Rasterize the upper bound (97.5% quantile) of predicted prevalence onto the template raster and plot the map.  
+
+r_UL <- rasterize(x = pred_vect, y = ra, field = "UL", fun = mean)
+plot(r_UL)
+```
+
+```{r}
+# Convert the prediction dataframe to an sf point object with WGS84 coordinates, 
+# transform predicted logit-scale means to prevalence probabilities using plogis()
+
+pred_points <- st_as_sf(pred_df, coords = c("x", "y"), crs = 4326)
+
+pred_points$prevalence <- plogis(pred_points$prev_mean)
+
+head(pred_points)
+```
+
+```{r}
+
+gambia_map <- read_rds("gambia_map.rds")
+
+ggplot() +
+    geom_sf(data = gambia_map) +
+    geom_sf(data = pred_points, aes(color = prevalence)) +
+    scale_color_viridis()
+```

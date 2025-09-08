@@ -1,0 +1,380 @@
+---
+title: "SPATIAL STATISTICS"
+format: html
+editor: visual
+engine: knitr
+default-language: R
+code-overflow: wrap
+df-print: kable
+execute: 
+  echo: true
+  warning: false
+  message: false  
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(broom)
+library(janitor)
+library(gt)
+library(gtsummary)
+theme_set(theme_bw())
+```
+
+```{r}
+library(sf)
+library(terra)
+library(gstat)
+library(sp)
+```
+
+```{r}
+load("rongelap-outline.rdata")
+```
+
+```{r}
+class(rongelap_shp)
+```
+
+`sfg` is a simple feature geometry (not a full geometry object). To use in a map it must be converted to an sf object.
+
+```{r}
+st_sfc(rongelap_shp) 
+# sfc = simple feature collection
+# wraps the single geometry into a collection
+
+```
+
+```{r}
+rongelap_outline_sf <- st_sf(geometry = st_sfc(rongelap_shp), crs = 4326)
+
+str(rongelap_outline_sf)
+```
+
+```{r}
+ggplot(rongelap_outline_sf) +
+  geom_sf(fill = "skyblue", color = "black") +
+  theme_minimal()
+
+```
+
+```{r}
+
+rongelap_data <- st_read("rongelap.shp")
+```
+
+```{r}
+
+range <- 2
+h <-  seq(0,10,length.out = 100)
+
+cov_fun <- exp(-h/range)
+
+```
+
+```{r}
+ggplot()+
+  geom_line(aes(x = h,y = cov_fun),linewidth = 1,color = "red")+
+  labs(x = "Distance", y= "Covariance ")
+```
+
+```{r}
+nugget <- 0.2
+
+ggplot()+
+  geom_line(aes(x = h, y = (1-cov_fun + nugget)),linewidth = 1,color = "red")+
+  labs(x = "Distance", y= "Semivariance")
+```
+
+```{r}
+grid <- expand_grid(
+  x = seq(0,10,length.out = 100),
+  y = seq(0,10,length.out = 100)
+) |> 
+  mutate(id = row_number()) |> 
+  select(id,x,y)
+```
+
+```{r}
+
+coordinates(grid) <- ~x + y
+grid_sf <- st_as_sf(grid,coords = c("x","y"), crs = 4326)
+```
+
+```{r}
+# theoretical variogram
+vmod <- vgm(psill = 1,model = "Exp",range = 1,nugget = 0)
+```
+
+```{r}
+sim <- gstat( formula =  z ~ 1, 
+            locations = ~ x + y, 
+            dummy = TRUE, 
+            beta = 0, 
+            model = vmod,
+            nmax = 20)
+
+set.seed(123)
+z <- predict(sim,newdata = grid,nsim =4)
+
+spplot(z["sim1"])
+```
+
+```{r}
+df_sim <- as.data.frame(z)
+
+head(df_sim)
+```
+
+```{r}
+ggplot(data = df_sim,aes(x = x, y= y, fill = sim1))+
+  geom_raster()+
+  scale_fill_viridis_c()+
+  coord_equal()+
+  labs(fill = "Value",x = NULL,y = NULL)
+```
+
+```{r}
+z_sf <- st_as_sf(z)
+
+```
+
+```{r}
+
+ggplot()+
+  geom_sf(data = z_sf,aes(color = sim1))+
+  scale_color_viridis_c()
+```
+
+```{r}
+z_sp <- as(z_sf,"Spatial")
+# empirical variogram
+
+variogram_result <- variogram(
+  sim1~ 1,
+  data = z_sp
+)
+```
+
+```{r}
+variogram_result |> 
+  ggplot(aes(x = dist,y = gamma))+
+   geom_line(color = "#E3BC6F",linewidth = 1)+
+  geom_point(size = 2)+
+   labs(x = "Distance", y = "Semivariance γ(h)",
+       title = "Empirical Variogram (sim1)") +
+  theme_minimal()
+```
+
+```{r}
+rongelap_data <- read_csv("rongelap.csv")
+rongelap_sf <- st_read("rongelap.shp")
+## convert data to sf
+rongelap <- st_as_sf(rongelap_data, coords = c("x","y"))
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = rongelap_shp)
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = rongelap_shp, fill = NA)+
+  geom_sf(data = rongelap,aes(color = log(val)))+
+  scale_color_viridis_c()
+```
+
+```{r}
+
+rsplit <- initial_split(rongelap,prop = 0.8,strata = val)
+r2 <-  training(rsplit)
+r3 <- testing(rsplit)
+```
+
+```{r}
+rongelap_cv <- krige.cv(
+  formula =  log(val)~ 1,
+  locations = r2,
+ # newdata = r3, # newdat is not needed for cross validation
+  model = vgm(psill = 0.5,model = "Exp",range = 500,nugget = 0.5),
+  nfold = 5
+)
+```
+
+```{r}
+rongelap_cv |> sample_n(10)
+```
+
+```{r}
+RMSE = sqrt(mean(rongelap_cv[["residual"]]^2,na.rm = TRUE))
+MAE <- mean(abs(rongelap_cv$residual), na.rm = TRUE)
+```
+
+```{r}
+class(rongelap_cv)
+
+rmse(rongelap_cv,truth = observed,estimate = var1.pred)
+mae(rongelap_cv,truth = observed,estimate = var1.pred)
+```
+
+```{r}
+## metric set to compute multiple metrics at once
+
+rongelap_metrics <- metric_set(rmse,rsq,mae)
+rongelap_metrics(data = rongelap_cv,truth = observed, estimate = var1.pred)
+```
+
+```{r}
+rongelap_cv |> 
+  ggplot(aes(x = observed,y = var1.pred))+
+  geom_point()+
+  geom_abline(linetype = 2,color = "red")+
+  coord_obs_pred()
+```
+
+```{r}
+## load the meuse data
+
+meuse <- read_csv("meuse.csv")
+meause_grid <- read_csv("meuse.grid.csv")
+
+## convert to sf type
+meuse <- st_as_sf(meuse,coords = c("x","y"))
+meuse_grid <- st_as_sf(meause_grid,coords = c("x","y"))
+
+meuse <- meuse |> 
+  mutate(log_zinc = log(zinc))
+```
+
+```{r}
+
+ggplot()+
+  geom_sf(data = meuse,aes(size = lead),alpha = 0.8, color = "#E3BC6F")
+```
+
+```{r}
+
+vario <- variogram(log(lead)~ sqrt(dist),data = meuse)
+
+vario
+
+plot(vario)
+```
+
+```{r}
+vario_fit <- fit.variogram(
+  object = vario,
+  model = vgm(psill = 0.5, nugget = 0.1,range = 1000,model = "Exp")
+)
+```
+
+```{r}
+vario_fit
+```
+
+```{r}
+plot(vario,vario_fit)
+```
+
+```{r}
+fitted_line <- variogramLine(vario_fit,maxdist = max(vario[["dist"]]), n= 100)
+```
+
+```{r}
+head(vario,10)
+```
+
+```{r}
+
+fitted_line |> 
+  ggplot(aes(x = dist, y= gamma))+
+  geom_point(data = vario,aes(x = dist, y= gamma))+
+  geom_line(color = "red",linewidth = 1)
+```
+
+```{r}
+meuse_fit <- krige(
+  formula = log(lead) ~ sqrt(dist),
+  locations = meuse,
+  newdata = meuse_grid,
+  model = vario_fit
+)
+```
+
+```{r}
+meuse_fit |> head(10)
+
+```
+
+```{r}
+models <- c("Sph", "Exp", "Gau")
+
+# Fit each model
+vgm_fits <- map(models, ~ fit.variogram(vario, model = vgm(0.3, .x, 600, 0.1)))
+names(vgm_fits) <- models
+```
+
+```{r}
+cv_results <- map_dfr(
+  names(vgm_fits),
+  ~ {
+    model_name <- .x
+    fit <- vgm_fits[[.x]]
+    
+    cv <- krige.cv(log(zinc) ~ 1, meuse, model = fit)
+    
+    # Extract predictions and observed
+    tibble(
+      model = model_name,
+      observed = cv$observed,
+      predicted = cv$var1.pred
+    )
+  }
+)
+
+cv_results |> sample_n(10)
+```
+
+```{r}
+my_metrics <- metric_set(rmse, rsq, mae)
+```
+
+```{r}
+cv_results |> 
+  group_by(model) |> 
+  my_metrics(truth = observed,estimate = predicted)
+```
+
+```{r}
+cv_results |> 
+  group_by(model) |> 
+  my_metrics(truth = observed, estimate = predicted) |> 
+  ggplot(aes(x = .metric, y = .estimate, fill = model)) +
+  geom_col(position = "dodge") +
+  labs(title = "Cross-Validation Metrics by Variogram Model") +
+  theme_minimal()
+
+```
+
+```{r}
+
+cv_results |> 
+  group_by(model) |> 
+  my_metrics(truth = observed, estimate = predicted) |> 
+  ggplot(aes(x = model, y = .estimate, fill = .metric)) +
+  geom_col(position = "dodge") +
+  labs(title = "Cross-Validation Metrics by Variogram Model") +
+  theme_minimal()
+```
+
+```{r}
+
+```
+
+```{r}
+
+```

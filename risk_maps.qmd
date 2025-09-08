@@ -1,0 +1,385 @@
+---
+title: "DISEASE RISK MAPPING"
+format: html
+df-print: kable
+code-overflow: wrap
+execute: 
+  echo: true
+  warning: false
+  message: false
+---
+
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(sf)
+library(spdep)
+library(terra)
+library(tmap)
+theme_set(theme_bw())
+
+
+load("data/pennLC.rda")
+load("data/pennLC_sf.rda")
+class(pennLC)
+glimpse(pennLC)
+geo <- pennLC$geo
+data <- pennLC$data
+smoking <- pennLC$smoking
+spatial_polygon <- pennLC$spatial.polygon
+
+
+class(geo)
+class(spatial_polygon)
+
+glimpse(data)
+
+d <- data |>
+  group_by(county) |>
+  summarise(observed_cases = sum(cases))
+
+library(SpatialEpi)
+
+
+data_ordered <- data |>
+  arrange(county, race, gender, age)
+head(data_ordered)
+
+
+d <- d |>
+  mutate(
+    expected_cases = expected(
+      population = data_ordered$population,
+      cases = data_ordered$cases,
+      n.strata = 16
+    )
+  )
+
+d <- d |>
+  left_join(smoking, by = "county")
+
+head(d)
+
+d <- d |>
+  mutate(smr = observed_cases / expected_cases)
+
+rownames(d) <- d$county
+
+head(pennLC_sf)
+
+class(pennLC_sf)
+
+map <- pennLC_sf |>
+  distinct(county, geometry)
+
+ggplot(map) +
+  geom_sf()
+
+d <- d |>
+  left_join(map, by = "county")
+
+map <- map |>
+  left_join(d, by = "county")
+
+glimpse(d)
+
+tmap_mode("plot")
+
+tm_shape(map) +
+  tm_polygons(
+    fill = "smr",
+    fill.scale = tm_scale_continuous(values = "viridis"),
+    # fill.legend = tm_legend(position = "right")
+  ) +
+  tm_layout(legend.position = c("right", "center"), legend.outside = TRUE)
+
+
+ggplot(map) +
+  geom_sf(aes(fill = smr)) +
+  scale_fill_viridis_c()
+
+
+penn_ordered <- pennLC_sf |>
+  st_drop_geometry() |>
+  arrange(county, race, gender, age)
+
+E_all <- expected(
+  population = penn_ordered$population,
+  cases = penn_ordered$cases,
+  n.strata = 16
+)
+
+
+penn_processed_sf <- pennLC_sf |>
+  group_by(county) |>
+  summarise(
+    Y = sum(cases),
+    smoking = mean(smoking, na.rm = TRUE),
+    county_population = sum(population),
+    .groups = "drop"
+  ) |>
+  mutate(E = E_all, smr = Y / E)
+
+ggplot(penn_processed_sf) +
+  geom_sf(aes(fill = smr)) +
+  scale_fill_viridis_c()
+
+
+# Adjacency matrix -------------------------------------------------------
+
+nb <- poly2nb(penn_processed_sf, queen = TRUE)
+nb2INLA(file = "pa.adj.graph", nb)
+
+penn_inla <- penn_processed_sf |>
+  st_drop_geometry() |>
+  mutate(
+    id = as.numeric(factor(county)),
+    re_u = 1:n(),
+    re_v = 1:n()
+  ) |>
+  select(id, county, Y, E, smoking, re_u, re_v)
+
+library(INLA)
+formula <- Y ~ 1 + f(id, model = "bym", graph = "pa.adj.graph")
+
+res <- inla(
+  formula,
+  family = "poisson",
+  data = penn_inla,
+  E = E,
+  control.predictor = list(compute = TRUE),
+  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE)
+)
+
+summary(res)
+
+formula2 <- Y ~
+  smoking +
+    f(re_u, model = "besag", graph = "pa.adj.graph", scale.model = TRUE) +
+    f(re_v, model = "iid")
+
+res2 <- inla(
+  formula2,
+  family = "poisson",
+  data = penn_inla,
+  E = E,
+  control.predictor = list(compute = TRUE),
+  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE)
+)
+
+# Formula with BYM2
+formula_bym2 <- Y ~
+  smoking +
+    f(
+      re_u,
+      model = "bym2",
+      graph = "pa.adj.graph",
+      scale.model = TRUE, # scale spatial effect
+      hyper = list(
+        # priors for hyperparameters
+        prec = list(prior = "pc.prec", param = c(1, 0.01)), # PC prior for precision
+        phi = list(prior = "pc", param = c(0.5, 2 / 3)) # PC prior for mixing
+      )
+    )
+
+# Fit BYM2 model
+res_bym2 <- inla(
+  formula_bym2,
+  family = "poisson",
+  data = penn_inla,
+  E = E,
+  control.predictor = list(compute = TRUE),
+  control.compute = list(
+    dic = TRUE,
+    waic = TRUE,
+    cpo = TRUE,
+    return.marginals.predictor = TRUE
+  )
+)
+
+summary(res2)
+summary(res_bym2)
+names(res_bym2)
+glimpse(res_bym2$summary.fitted.values)
+
+marginal <- inla.smarginal(res_bym2$marginals.fixed$smoking)
+class(marginal)
+marginal_df <- as.data.frame(marginal)
+glimpse(marginal_df)
+
+marginal_tibble <- tibble(
+  x = marginal$x,
+  y = marginal$y
+)
+
+marginal_tibble |>
+  ggplot() +
+  geom_line(aes(x, y)) +
+  geom_vline(
+    xintercept = 0,
+    color = "red",
+    linetype = "dashed",
+    linewidth = 1
+  ) +
+  labs(x = expression(beta[1]), y = "Density")
+
+glimpse(res_bym2$summary.fitted.values$mean)
+
+penn_inla <- penn_inla |>
+  mutate(
+    mean = res_bym2$summary.fitted.values$mean,
+    LL = res_bym2$summary.fitted.values$`0.025quant`,
+    UL = res_bym2$summary.fitted.values$`0.975quant`
+  )
+
+penn_processed_sf <- penn_processed_sf |>
+  mutate(
+    RR = res_bym2$summary.fitted.values$mean,
+    LL = res_bym2$summary.fitted.values$`0.025quant`,
+    UL = res_bym2$summary.fitted.values$`0.975quant`
+  )
+
+rr <- penn_processed_sf |>
+  ggplot() +
+  geom_sf(aes(fill = RR)) +
+  scale_fill_viridis_c()
+
+smr <- penn_processed_sf |>
+  ggplot() +
+  geom_sf(aes(fill = smr)) +
+  scale_fill_viridis_c()
+
+library(patchwork)
+smr + rr
+
+fv <- res_bym2$marginals.fitted.values
+
+thr <- 1
+exceed_probs <- sapply(fv, function(m) {
+  1 - inla.pmarginal(thr, m)
+})
+exceed_probs <- map_dbl(fv, function(m) 1 - inla.pmarginal(1, m))
+
+penn_processed_sf <- penn_processed_sf |>
+  mutate(exceed_prob = as.numeric(exceed_probs))
+
+tm_shape(penn_processed_sf) +
+  tm_polygons(fill = "exceed_prob")
+tm_borders() +
+  tm_layout(legend.outside = TRUE)
+
+
+penn_processed_sf |>
+  ggplot() +
+  geom_sf(aes(fill = exceed_prob))
+
+
+tm_shape(penn_processed_sf) +
+  tm_polygons(
+    fill = "exceed_prob",
+    fill.scale = tm_scale_continuous(values = "-RdBu"),
+    fill.legend = tm_legend(title = "P(RR > 1)", style = "cont")
+  ) +
+  tm_borders() +
+  tm_layout(legend.outside = TRUE)
+
+
+ggplot(penn_processed_sf, aes(fill = exceed_prob)) +
+  geom_sf() +
+  scale_fill_distiller(palette = "RdBu", direction = -1) +
+  theme_minimal()
+
+library(RColorBrewer)
+ggplot(penn_processed_sf, aes(fill = exceed_prob)) +
+  geom_sf() +
+  scale_fill_gradientn(colors = brewer.pal(11, "RdBu")[11:1]) +
+  theme_minimal()
+
+plot_data <- penn_processed_sf %>%
+  st_drop_geometry() %>%
+  select(county, smr, RR, exceed_prob) %>%
+  pivot_longer(
+    cols = c(smr, RR, exceed_prob),
+    names_to = "measure",
+    values_to = "value"
+  ) %>%
+  left_join(penn_processed_sf, by = "county") %>%
+  st_as_sf()
+
+ggplot(plot_data) +
+  geom_sf(aes(fill = value), color = "grey40", size = 0.2) +
+  scale_fill_distiller(palette = "RdBu", direction = -1) +
+  facet_wrap(
+    ~measure,
+    ncol = 3,
+    labeller = as_labeller(c(
+      smr = "Crude SMR",
+      RR = "BYM2 Smoothed RR",
+      exceed_prob = "Exceedance P(RR>1)"
+    ))
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(size = 12, face = "bold")
+  ) +
+  guides(fill = guide_colorbar(title = "Value"))
+
+library(patchwork)
+
+p1 <- ggplot(penn_processed_sf) +
+  geom_sf(aes(fill = smr)) +
+  scale_fill_distiller(palette = "RdBu", direction = -1, limits = c(0.5, 1.5)) +
+  ggtitle("Crude SMR") +
+  theme_minimal()
+
+p2 <- ggplot(penn_processed_sf) +
+  geom_sf(aes(fill = RR)) +
+  scale_fill_distiller(palette = "RdBu", direction = -1, limits = c(0.8, 1.2)) +
+  ggtitle("BYM2 Smoothed RR") +
+  theme_minimal()
+
+p3 <- ggplot(penn_processed_sf) +
+  geom_sf(aes(fill = exceed_prob)) +
+  scale_fill_gradient(low = "white", high = "darkred", limits = c(0, 1)) +
+  ggtitle("Exceedance P(RR > 1)") +
+  theme_minimal()
+
+
+(p1 | p2 | p3) +
+  plot_layout(guides = "collect") &    # collect legends into one
+  theme(legend.position = "bottom") 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```

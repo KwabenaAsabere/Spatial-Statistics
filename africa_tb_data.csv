@@ -1,0 +1,55 @@
+"","country","iso3","population","gdp","incidence_rate"
+"1","Algeria","DZA",46164169,6000,47
+"2","Angola","AGO",36749852,1900,339
+"3","Benin","BEN",14110987,1100,51
+"4","Botswana","BWA",2480185,9000,244
+"5","Burkina Faso","BFA",23025738,1100,43
+"6","Burundi","BDI",13689406,600,94
+"7","Cabo Verde","CPV",NA,NA,47
+"8","Cameroon","CMR",28372638,1800,150
+"9","Central African Republic","CAF",5152373,NA,540
+"10","Chad","TCD",19319025,1200,139
+"11","Comoros","COM",850335,700,35
+"12","Democratic Republic Of The Congo",NA,NA,NA,NA
+"13","Republic Of The Congo",NA,NA,NA,NA
+"14","Côte D'Ivoire",NA,NA,NA,NA
+"15","Djibouti","DJI",1152912,1300,218
+"16","Egypt","EGY",114535724,4000,9.2
+"17","Equatorial Guinea","GNQ",1847501,2700,274
+"18","Eritrea","ERI",3470344,700,65
+"19","Eswatini","SWZ",1230457,NA,350
+"20","Ethiopia","ETH",128691654,700,146
+"21","Gabon","GAB",2484739,5500,505
+"22","Gambia","GMB",2697797,NA,142
+"23","Ghana","GHA",33787870,2200,129
+"24","Guinea","GIN",14405424,2100,175
+"25","Guinea-Bissau","GNB",2153292,800,361
+"26","Kenya","KEN",55338953,1000,223
+"27","Lesotho","LSO",2311429,3000,664
+"28","Liberia","LBR",5492981,1000,308
+"29","Libya","LBY",7305611,6400,59
+"30","Madagascar","MDG",31195885,800,233
+"31","Malawi","MWI",21104426,600,119
+"32","Mali","MLI",23769081,900,48
+"33","Mauritania","MRT",5022397,1800,74
+"34","Mauritius","MUS",1273543,11400,12
+"35","Morocco","MAR",37712463,4000,92
+"36","Mozambique","MOZ",33635119,1200,361
+"37","Namibia","NAM",2963048,7200,468
+"38","Niger","NER",26159817,800,74
+"39","Nigeria","NGA",227882899,900,219
+"40","Rwanda","RWA",13954429,1300,55
+"41","São Tomé And Príncipe",NA,NA,NA,NA
+"42","Senegal","SEN",18077527,1600,110
+"43","Seychelles","SYC",127910,7800,21
+"44","Sierra Leone","SLE",8460469,500,283
+"45","Somalia","SOM",18358576,500,243
+"46","South Africa","ZAF",63212339,10700,427
+"47","South Sudan","SSD",11483321,NA,227
+"48","Sudan","SDN",50042754,1900,50
+"49","Tanzania",NA,66617556,600,NA
+"50","Togo","TGO",9304289,1500,30
+"51","Tunisia","TUN",12200387,6900,38
+"52","Uganda","UGA",48656550,1400,198
+"53","Zambia","ZMB",20723923,800,283
+"54","Zimbabwe","ZWE",16340778,1900,211

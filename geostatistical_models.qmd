@@ -1,0 +1,441 @@
+---
+title: "DISEASE RISK MAPPING"
+format: html
+df-print: kable
+code-overflow: wrap
+execute: 
+  echo: true
+  warning: false
+  message: false
+engine: knitr
+---
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(sf)
+library(spdep)
+library(terra)
+library(tmap)
+library(SpatialEpi)
+library(INLA)
+library(leaflet)
+theme_set(theme_bw())
+
+```
+
+```{r}
+load("data/gambia.rda")
+```
+
+```{r}
+
+head(gambia)
+```
+
+```{r}
+gambia_sf <- gambia |>
+  group_by(x, y) |>
+  summarise(
+    total = n(),
+    positive = sum(pos),
+    prevalence = positive / total,
+    .groups = "drop"
+  ) |>
+  mutate(id = row_number()) |>
+  st_as_sf(coords = c("x", "y"), crs = 32628) |> 
+  st_transform(4326) 
+
+
+
+```
+```{r}
+ggplot(gambia_sf)+
+  geom_sf()
+
+```
+
+
+
+```{r}
+gambia_senegal <- st_read("data/senegal_and_gambia_Senegal_and_Gambia_Country_Boundary.geojson")
+```
+
+```{r}
+ggplot(gambia_senegal) +
+  geom_sf()+
+  geom_sf(data = gambia_sf)
+```
+
+
+
+```{r}
+gm_sf <- st_read("data/gm.json")
+gm_sf
+```
+
+```{r}
+ggplot(gm_sf)+
+  geom_sf(linewidth = 0.7)+
+  geom_sf(data = gambia_sf)
+```
+
+
+```{r}
+# gambia_sf
+
+# gambia
+```
+
+```{r}
+gambia_sf <- gambia_sf |> 
+  mutate(
+    long = st_coordinates(geometry)[,1],
+    lat = st_coordinates(geometry)[,2]
+  )
+```
+
+```{r}
+glimpse(gambia_sf)
+head(gambia_sf)
+```
+
+```{r}
+pal <- colorBin("viridis", bins = c(0, 0.25, 0.5, 0.75, 1))
+leaflet(gambia_sf) %>%  addProviderTiles(providers$CartoDB.Positron) %>%
+  addCircles(lng = ~long, lat = ~lat, color = ~pal(prevalence)) %>%
+   addLegend("bottomright", pal = pal, values = ~prevalence, title = "Prevalence") %>%
+  addScaleBar(position = c("bottomleft"))
+```
+
+```{r}
+library(geodata)
+#3 r <- elevation_30s(country = "GMB", path = tempdir())
+r <- elevation_30s("GMB", path = "data/")
+plot(r)
+```
+
+```{r}
+pal <- colorNumeric("viridis", values(r), na.color = "transparent")
+
+leaflet() %>% addProviderTiles(providers$CartoDB.Positron) %>%
+  addRasterImage(r, colors = pal, opacity = 0.5) %>%
+  addLegend("bottomright", pal = pal, values = values(r), title = "Altitude") %>%
+  addScaleBar(position = c("bottomleft"))
+```
+
+```{r}
+gambia_sf <- gambia_sf |>
+  mutate(alt = terra::extract(r, vect(gambia_sf))[,2])
+
+gambia_sf <- gambia_sf |> drop_na()
+```
+
+```{r}
+ggplot(gambia_sf) +
+  geom_sf(data = gm_sf)+
+  geom_sf(aes(color = prevalence, size = alt)) +
+  scale_color_viridis_c() +
+  theme_minimal()
+```
+
+### Build Mesh
+```{r}
+library(INLA)
+coords <- st_coordinates(gambia_sf)
+mesh <- inla.mesh.2d(loc = coords, max.edge = c(0.1,5),cutoff = 0.01)
+```
+
+```{r}
+mesh$n
+plot(mesh)
+points(coords,col = "red")
+```
+
+```{r}
+plot(mesh)
+points(coords, col = "red", pch = 19, cex = 0.5)
+
+```
+
+### Build the SPDE model on the mesh
+
+```{r}
+spde <- inla.spde2.matern(mesh = mesh, alpha = 2)
+A <- inla.spde.make.A(mesh = mesh, loc = coords)  # projector matrix
+s.index <- inla.spde.make.index("spatial", spde$n.spde)
+formula <- Y ~ 1 + altitude + f(spatial, model = spde)
+
+
+```
+
+```{r}
+stack <- inla.stack(
+  data = list(y = gambia_sf$positive, Ntrials = gambia_sf$total),
+  A = list(1, A),
+  effects = list(
+    data.frame(intercept = 1, altitude = gambia_sf$alt),
+    spatial = s.index$spatial
+  ),
+  tag = "est"
+)
+
+```
+
+```{r}
+formula <- y ~ 0 + intercept + altitude +
+  f(spatial, model = spde)
+
+result <- inla(
+  formula,
+  family = "binomial",
+  Ntrials = inla.stack.data(stack)$Ntrials,
+  data = inla.stack.data(stack),
+  control.predictor = list(A = inla.stack.A(stack), compute = TRUE),
+  control.compute = list(dic = TRUE, waic = TRUE, cpo = TRUE)
+)
+
+summary(result)
+
+```
+
+
+```{r}
+gambia_boundary <- st_as_sf(gambia.borders |> drop_na(),coords = c("x", "y"),crs = 32628) |> 
+  st_transform(4326) 
+
+```
+
+```{r}
+ggplot(gm_sf)+
+  geom_sf()
+```
+
+```{r}
+gambia_boundary <- gm_sf
+# Create a regular prediction grid inside boundary
+pred_grid <- st_make_grid(gambia_boundary, cellsize = 0.05, square = TRUE) |> 
+  st_intersection(gambia_boundary)
+
+# Convert to points (centroids)
+pred_points <- st_centroid(pred_grid)
+coords_pred <- st_coordinates(pred_points)
+
+A_pred <- inla.spde.make.A(mesh = mesh, loc = coords_pred)
+
+
+```
+
+```{r}
+stack_pred <- inla.stack(
+  data = list(y = NA, Ntrials = NA),
+  A = list(1, A_pred),
+  effects = list(
+    data.frame(intercept = rep(1, nrow(coords_pred)),
+               altitude = rep(mean(gambia_sf$alt, na.rm = TRUE), 
+                              nrow(coords_pred))),  # or extract real altitude if available
+    spatial = s.index$spatial
+  ),
+  tag = "pred"
+)
+
+# Combine with estimation stack
+stack_full <- inla.stack(stack, stack_pred)
+
+```
+
+```{r}
+result <- inla(
+  formula,
+  family = "binomial",
+  Ntrials = inla.stack.data(stack_full)$Ntrials,
+  data = inla.stack.data(stack_full),
+  control.predictor = list(A = inla.stack.A(stack_full), compute = TRUE),
+  control.compute = list(dic = TRUE, waic = TRUE)
+)
+
+```
+
+```{r}
+index_pred <- inla.stack.index(stack_full, "pred")$data
+pred_mean <- result$summary.fitted.values[index_pred, "mean"]
+pred_sd   <- result$summary.fitted.values[index_pred, "sd"]
+```
+
+```{r}
+# Get coordinates safely (each geometry is a POINT)
+coords <- do.call(rbind, lapply(st_geometry(pred_points), function(pt) unlist(pt)))
+
+# Build clean data.frame
+pred_df <- data.frame(
+  X = coords[,1],
+  Y = coords[,2],
+  mean = as.numeric(pred_mean),
+  sd   = as.numeric(pred_sd)
+)
+
+# Rebuild sf object
+pred_points <- st_as_sf(pred_df, coords = c("X", "Y"), crs = 4326)
+
+# Add prevalence (logit^-1 of mean)
+pred_points$prevalence <- plogis(pred_points$mean)
+
+```
+
+```{r}
+library(ggplot2)
+
+ggplot() +
+  geom_sf(data = gambia_boundary, fill = NA, color = "black") +
+  geom_sf(data = pred_points, aes(color = mean), size = 1) +
+  scale_color_viridis_c(name = "Prevalence") +
+  theme_minimal() +
+  labs(title = "Predicted Prevalence of Infection in The Gambia (INLA-SPDE)",
+       subtitle = "Posterior mean from spatial binomial model")
+
+```
+
+```{r}
+ggplot() +
+  geom_sf(data = gambia_boundary, fill = NA, color = "black") +
+  geom_sf(data = pred_points, aes(color = prevalence), size = 1) +
+  scale_color_viridis_c(name = "Prevalence (0–1)", limits = c(0, 1)) +
+  theme_minimal() +
+  labs(
+    title = "Predicted Prevalence of Infection in The Gambia (INLA-SPDE)",
+    subtitle = "Posterior mean prevalence (probability scale)"
+  )
+```
+
+```{r}
+# Build projector for mesh onto grid
+proj <- inla.mesh.projector(mesh, 
+                            xlim = st_bbox(gambia_boundary)[c("xmin","xmax")],
+                            ylim = st_bbox(gambia_boundary)[c("ymin","ymax")],
+                            dims = c(200, 200))  # resolution of the grid
+
+# Project posterior mean
+proj_mean <- inla.mesh.project(proj, result$summary.random$spatial$mean)
+
+# Convert to raster
+library(raster)
+r <- raster(list(x = proj$x, y = proj$y, z = proj_mean))
+
+# Mask with Gambia boundary
+r_masked <- mask(r, as(gambia_boundary, "Spatial"))
+
+# Plot
+plot(r_masked, main = "Predicted Prevalence (INLA-SPDE)", col = viridis::viridis(100))
+plot(st_geometry(gambia_boundary), add = TRUE)
+
+```
+
+
+```{r}
+# Project posterior mean onto the grid
+proj_mean <- inla.mesh.project(proj, result$summary.random$spatial$mean)
+
+# Convert logit-scale to probability scale
+proj_prev <- plogis(proj_mean)
+
+# Build raster
+r_prev <- raster(list(x = proj$x, y = proj$y, z = proj_prev))
+
+# Mask with Gambia boundary
+r_prev_masked <- mask(r_prev, as(gambia_boundary, "Spatial"))
+
+# Plot prevalence
+plot(r_prev_masked,
+     main = "Predicted Prevalence (0–1 scale, INLA-SPDE)",
+     col = viridis::viridis(100))
+plot(st_geometry(gambia_boundary), add = TRUE)
+
+```
+
+
+```{r}
+library(viridis)
+proj_sd <- inla.mesh.project(proj, result$summary.random$spatial$sd)
+r_sd <- raster(list(x = proj$x, y = proj$y, z = proj_sd))
+r_sd_masked <- mask(r_sd, as(gambia_boundary, "Spatial"))
+
+plot(r_sd_masked,
+     main = "Posterior Uncertainty (SD of Prevalence)",
+     col = viridis::viridis(100))
+plot(st_geometry(gambia_boundary), add = TRUE)
+
+```
+
+```{r}
+# Build a projector for a regular grid covering Gambia
+bb <- st_bbox(gambia_boundary)
+
+# Build projector
+proj <- inla.mesh.projector(
+  mesh,
+  xlim = c(bb["xmin"], bb["xmax"]),
+  ylim = c(bb["ymin"], bb["ymax"]),
+  dims = c(200, 200)  # grid resolution
+)
+
+# Project fitted values from mesh onto raster grid
+proj_mean <- inla.mesh.project(proj, result$summary.random$spatial$mean)
+proj_sd   <- inla.mesh.project(proj, result$summary.random$spatial$sd)
+
+# Turn into raster
+r_mean <- raster(list(x = proj$x, y = proj$y, z = proj_mean))
+r_sd   <- raster(list(x = proj$x, y = proj$y, z = proj_sd))
+
+# Mask to Gambia boundary
+r_mean_masked <- mask(r_mean, as(gambia_boundary, "Spatial"))
+r_sd_masked   <- mask(r_sd, as(gambia_boundary, "Spatial"))
+
+# Convert mean to probability scale
+r_mean_masked <- calc(r_mean_masked, plogis)
+
+# Plot
+p1 <- rasterVis::levelplot(r_mean_masked,
+        margin = FALSE,
+        col.regions = viridis(100),
+        main = "Posterior Mean Prevalence (0–1 scale)") +
+        latticeExtra::layer(sp.lines(as(gambia_boundary, "Spatial"), col="black"))
+
+p2 <- rasterVis::levelplot(r_sd_masked,
+        margin = FALSE,
+        col.regions = viridis(100),
+        main = "Posterior Uncertainty (SD)") +
+        latticeExtra::layer(sp.lines(as(gambia_boundary, "Spatial"), col="black"))
+
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

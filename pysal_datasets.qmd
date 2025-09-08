@@ -1,0 +1,118 @@
+---
+title: "SPATIAL HYPOTHESIS TESTING"
+format: html
+engine: knitr
+editor: visual
+default-language: R
+code-overflow: wrap
+df-print: kable
+execute: 
+  echo: true
+  warning: false
+  message: false  
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(broom)
+library(janitor)
+library(gt)
+library(gtsummary)
+theme_set(theme_bw())
+```
+
+```{r}
+library(sf)
+library(terra)
+library(gstat)
+```
+
+```{r}
+
+socal <- st_read("pysal/socal.shp")
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = socal,aes(fill = p_employed))
+```
+
+```{r}
+library(terra)
+sanDiego <- rast("pysal/san_diego.tif")
+
+san_diego_df <- as.data.frame(sanDiego,xy = TRUE)
+```
+
+```{r}
+ggplot()+
+  geom_raster(data = san_diego_df)
+```
+
+```{r}
+san_diego_df |> 
+  ggplot(aes(x = x,y = y, fill = san_diego_2))+
+  geom_raster()+
+  scale_fill_viridis_c() +
+  coord_equal() +
+  theme_minimal() +
+  labs(x = NULL, y = NULL)
+```
+
+```{r}
+# For RGB image plotting
+plotRGB(sanDiego, r = 1, g = 2, b = 3, stretch = "lin")
+
+nlyr(sanDiego)
+```
+
+```{r}
+
+scag_region <- st_read("pysal/scag_region.gpkg")
+```
+
+```{r}
+scag_region |> 
+  ggplot(aes(fill = p_employed_professional))+
+  geom_sf()+
+  scale_fill_viridis_c() +
+  theme_minimal() 
+```
+
+```{r}
+pairs_sf <- st_read("pysal/pairs.geojson")
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = pairs_sf)
+```
+
+```{r}
+library(arrow)
+dc_income <- read_parquet("pysal/dc_income.parquet")
+```
+
+```{r}
+dc_income_df <- tibble(dc_income)
+
+# Reconstruct the sf object from WKB geometry
+dc_income_sf <- dc_income |> 
+  mutate(geometry = st_as_sfc(geometry)) |> 
+  st_as_sf()
+```
+
+```{r}
+
+dc_income_sf |> 
+ggplot() +
+  geom_sf(aes(fill = share_very_low_inc)) +
+  facet_wrap(~year)+
+  scale_fill_viridis_c(name = "Very Low Income Share", na.value = "white") +
+  labs(title = "Share of Very Low-Income Households") +
+  theme_minimal()
+
+```

@@ -1,0 +1,97 @@
+```{r}
+library(tidyverse)
+library(sf)
+library(spdep)
+library(terra)
+theme_set(theme_bw())
+```
+
+```{r}
+
+africa_admin <- read_rds("tb/africa_gadm.rds")
+class(africa_admin)
+
+africa_admin_sf <- st_as_sf(africa_admin)
+```
+
+```{r}
+ggplot()+
+    geom_sf(data = africa_admin_sf)
+
+```
+
+```{r}
+load("tb/afripop2020.rda")
+afripop2020 <- rast(afripop2020)
+```
+
+```{r}
+class(afripop2020)
+project(afripop2020,"EPSG:4326")
+```
+
+```{r}
+afripop2020_df <- as.data.frame(afripop2020,xy = TRUE)
+```
+```{r}
+afripop2020_df |> 
+    ggplot(aes(x = x, y = y))+
+    geom_raster()
+```
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

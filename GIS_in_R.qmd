@@ -1,0 +1,261 @@
+---
+title: "SHAPE FILES"
+df-print: kable
+code-overflow: wrap
+execute: 
+  echo: true
+  warning: false
+  message: false
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(sf)
+library(tidyverse)
+library(terra)
+theme_set(theme_bw())
+```
+
+```{r}
+world_shapes <- st_read("ne_110m_admin_0_countries.shp")
+```
+
+```{r}
+glimpse(world_shapes)
+
+```
+
+```{r}
+world_shapes |> 
+  filter(iso_a3 == "GHA") |> 
+  ggplot()+
+  geom_sf()
+```
+
+```{r}
+world_shapes |> 
+  filter(continent == "Africa") |> 
+  ggplot()+
+  geom_sf(aes(fill = name))+
+  theme(legend.position = "None")
+```
+
+```{r}
+# use coord_sf() to change projections
+st_crs(world_shapes) <- 4326
+
+ggplot()+
+  geom_sf(data = world_shapes)+
+  coord_sf(crs = "+proj=robin")
+```
+
+```{r}
+
+ggplot()+
+  geom_sf(data = world_shapes,aes(fill = pop_est))+
+  coord_sf(crs = "+proj=robin")+
+  labs(fill = NULL)+
+  theme_void()+
+  theme(legend.position = "bottom")
+```
+
+```{r}
+world_map <- read_sf("data/ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp")
+
+us_states <- read_sf("data/cb_2018_us_state_20m/cb_2018_us_state_20m.shp")
+
+us_counties <- read_sf("data/cb_2018_us_county_5m/cb_2018_us_county_5m.shp")
+
+us_states_hires <- read_sf("data/ne_10m_admin_1_states_provinces/ne_10m_admin_1_states_provinces.shp")
+
+rivers_global <- read_sf("data/ne_10m_rivers_lake_centerlines/ne_10m_rivers_lake_centerlines.shp")
+
+rivers_na <- read_sf("data/ne_10m_rivers_north_america/ne_10m_rivers_north_america.shp")
+
+lakes <- read_sf("data/ne_10m_lakes/ne_10m_lakes.shp")
+
+ga_schools <- read_sf(file.path("data", "schools_2009", "DOE Schools 2009.shp"))
+```
+
+### MAPS
+
+```{r}
+ggplot() +
+  geom_sf(data = world_map)
+```
+
+```{r}
+map_minus_antartica <- world_map |> 
+  filter(ISO_A3 != "ATA")
+  
+
+```
+
+```{r}
+
+ggplot()+
+  geom_sf(data = map_minus_antartica, fill = "steelblue",color = "white",size = 1)+
+  theme_void()
+```
+
+### PROJECTIONS
+
+```{r}
+
+ggplot()+
+  geom_sf(data = map_minus_antartica, fill = "steelblue",color = "white",size = 1)+
+  coord_sf(crs = "+proj=robin +datum=WGS84")+
+  theme_void()
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = map_minus_antartica, fill = "steelblue",color = "white",size = 1)+
+  coord_sf(crs = "+proj=merc")+
+  theme_void()
+```
+
+```{r}
+st_crs(map_minus_antartica)
+```
+
+### MULTIPLE LAYERS WITH STATES AND COUNTIES
+
+```{r}
+ggplot()+
+  geom_sf(data = us_states)
+```
+
+```{r}
+lower_48 <- us_states |> 
+  filter(!NAME %in% c("Alaska","Hawaii","Pueto Rico"))
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = lower_48)
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = lower_48)+
+  coord_sf(crs = 102003)
+```
+
+```{r}
+
+only_georgia <- us_states |> 
+  filter(NAME == "Georgia")
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = only_georgia,fill =  "blue")
+```
+
+```{r}
+georgia_counties <- us_counties |> 
+  filter(STATEFP == 13)
+
+atl_counties <- georgia_counties %>% 
+  filter(NAME %in% c("Cherokee", "Clayton", "Cobb", "DeKalb", "Douglas",
+                     "Fayette", "Fulton", "Gwinnett", "Henry", "Rockdale")) 
+```
+
+```{r}
+ggplot()+
+ geom_sf(data = only_georgia,linewidth =2)+
+  geom_sf(data = georgia_counties,fill = "white",color = "black")
+```
+
+```{r}
+ggplot()+
+ geom_sf(data = only_georgia,linewidth =1)+
+  geom_sf(data = atl_counties,fill = "white",color = "black")
+```
+
+```{r}
+
+ggplot()+
+ #geom_sf(data = only_georgia,linewidth =1)+
+  geom_sf(data = ga_schools)+
+  coord_sf(crs = 4326)
+```
+
+```{r}
+ga_schools_fixed <-  ga_schools |> 
+  filter(ID != 22097)
+```
+
+```{r}
+ggplot()+
+ geom_sf(data = only_georgia,linewidth =1)+
+  geom_sf(data = georgia_counties,fill = "white")+
+  geom_sf(data = ga_schools_fixed,size = 0.7,alpha = 0.5,aes(color = TOTAL))+
+  scale_colour_viridis_c()
+```
+
+### MAPPING YOUR OWN POINTS
+
+```{r}
+
+ga_cities <- tribble(
+  ~city, ~lat, ~long,
+  "Atlanta", 33.748955, -84.388099,
+  "Athens", 33.950794, -83.358884,
+  "Savannah", 32.113192, -81.089350
+)
+ga_cities
+```
+
+```{r}
+ga_cities <- ga_cities |> 
+  st_as_sf(coords = c("long","lat"),crs = 4326)
+
+ga_cities
+```
+
+```{r}
+ggplot()+
+ geom_sf(data = only_georgia,linewidth = 0.5)+
+  geom_sf(data = atl_counties,fill = "white",color = "black")+
+  geom_sf(data = ga_cities)+
+  geom_sf_text(data = ga_cities,aes(label = city),nudge_y = 0.1)
+```
+
+### JOINING DATA
+
+```{r}
+library(WDI) # for getting data from World Bank
+indicators <- c("SP.DYN.LE00.IN")  # Life expectancy
+
+wdi_raw <- WDI(country = "all", indicators, extra = TRUE, 
+               start = 2015, end = 2015)
+```
+
+```{r}
+glimpse(wdi_raw)
+
+```
+
+```{r}
+wdi_clean <- wdi_raw |> 
+  select(life_expectancy = SP.DYN.LE00.IN,iso3c)
+
+ map_combined <- map_minus_antartica|> 
+  left_join(wdi_clean,by = c("ISO_A3" = "iso3c"))
+ 
+```
+
+```{r}
+ggplot()+
+  geom_sf(data = map_combined,aes(fill = life_expectancy))+
+  scale_fill_viridis_c()+
+  coord_sf(crs = "+proj=robin")+
+  theme_void()+
+  theme(legend.position = "bottom")+
+  labs(fill = NULL)
+```

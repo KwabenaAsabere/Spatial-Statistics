@@ -1,0 +1,399 @@
+---
+title: "TERRA PACKAGE"
+df-print: kable
+code-overflow: wrap
+execute: 
+  echo: true
+  warning: false
+  message: false
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(sf)
+library(tidyverse)
+library(terra)
+theme_set(theme_bw())
+```
+
+```{r}
+rast_obj <- rast(xmin = 0,xmax = 10,ymin= 0,ymax = 10,resolution = 2)
+
+rast_obj
+
+
+```
+
+```{r}
+ncell(rast_obj)
+
+values(rast_obj) <- 1:25
+
+rast_obj
+
+inMemory(rast_obj)
+```
+
+```{r}
+rast_df <- as.data.frame(rast_obj,xy = TRUE)
+rast_df
+```
+
+```{r}
+
+ggplot()+
+  geom_raster(data = rast_df,aes(x = x,y = y,fill = lyr.1)) +
+  scale_fill_viridis_c()
+```
+
+## REAL WORLD DATA
+
+```{r}
+sst <- rast("terra/gbr_temp_2023_05_31.tif")
+
+```
+
+```{r}
+sst
+plot(sst)
+```
+
+```{r}
+sst_df <- as.data.frame(sst,xy = TRUE, na.rm = FALSE)
+glimpse(sst_df)
+
+```
+
+```{r}
+ggplot()+
+  geom_raster(data = sst_df,aes(x = x,y = y ,fill = CRW_SST_2))+
+  scale_fill_viridis_c(na.value = "black")
+```
+
+```{r}
+plot(sst,colNA = "Black")
+```
+
+```{r}
+ggplot() +
+  geom_raster(data = sst_df, aes(x = x, y = y, fill = CRW_SST_2)) +
+  scale_fill_viridis_c(na.value = "black") +
+  coord_equal() +
+  labs(
+    title = "Sea Surface Temperature around Australia",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+## load some vector data for the Great barrier Reef marine park
+
+gbr_boundary <- vect("terra/gbr_MPA_boundary.gpkg")
+
+gbr_boundary_sf = st_as_sf(gbr_boundary)
+
+
+```
+
+```{r}
+plot(sst)
+lines(gbr_boundary)
+```
+
+```{r}
+
+ggplot() +
+  geom_raster(data = sst_df, aes(x = x, y = y, fill = CRW_SST_2)) +
+  geom_sf(data = gbr_boundary_sf, fill = NA, color = "red",linewidth = 1) +
+  scale_fill_viridis_c(name = "SST (°C)") +
+  coord_sf() +
+  theme_minimal() +
+  labs(title = "Sea Surface Temperature with GBR Boundary")
+
+```
+
+### Crop and Mask Data
+
+```{r}
+## crop
+sst_cropped <- crop(sst,gbr_boundary)
+
+sst_cropped_df <- as.data.frame(sst_cropped, xy = TRUE, na.rm = FALSE)
+class(sst_cropped)
+```
+
+```{r}
+plot(sst_cropped)
+lines(gbr_boundary)
+```
+
+```{r}
+ggplot() +
+  geom_raster(data = sst_cropped_df, aes(x = x, y = y, fill = CRW_SST_2)) +
+  geom_sf(data = gbr_boundary_sf, fill = NA, color = "black", linewidth = 1) +
+  scale_fill_viridis_c(name = "SST (°C)") +
+ coord_sf() +
+  theme_minimal() +
+  labs(title = "Sea Surface Temperature with GBR Boundary")
+```
+
+```{r}
+sst_cropped_masked <- mask(sst_cropped,gbr_boundary)
+
+sst_cropped_masked_df <- as.data.frame(sst_cropped_masked, xy = TRUE, na.rm = FALSE)
+```
+
+```{r}
+ggplot() +
+  geom_raster(data = sst_cropped_masked_df, aes(x = x, y = y, fill = CRW_SST_2)) +
+  geom_sf(data = gbr_boundary_sf, fill = NA, color = "black", linewidth = 1) +
+  scale_fill_viridis_c(name = "SST (°C)",na.value = "white") +
+ coord_sf() +
+  theme_minimal() +
+  labs(title = "Sea Surface Temperature with GBR Boundary",
+       x = "Longitude",
+    y = "Latitude")
+```
+
+```{r}
+# cropping and masking in smae command
+
+crop(sst,gbr_boundary,mask = TRUE) |> 
+  plot()
+```
+
+### Raster Values
+
+```{r}
+
+hist(sst_cropped_masked)
+hist(sst_cropped_masked,breaks = 100)
+```
+
+```{r}
+freq(sst_cropped_masked)
+freq(sst_cropped_masked,digits = 1)
+freq(sst_cropped_masked,value = NA)
+ncell(sst_cropped_masked)
+```
+
+```{r}
+summary(sst_cropped_masked)
+global(sst_cropped_masked,"mean",na.rm = TRUE)
+
+sst_mean <- global(sst_cropped_masked,"mean",na.rm = TRUE) |> 
+  as.numeric()
+
+sst_mean
+```
+
+```{r}
+sst_cropped_masked_df |> 
+  ggplot(aes(x = CRW_SST_2))+
+  geom_histogram(color = "white")
+```
+
+### Classification of a Raster
+
+```{r}
+
+reclass_matrix <- c(0,sst_mean,1,
+                    sst_mean,Inf,2) |> 
+  matrix(ncol = 3,byrow = TRUE)
+
+
+sst_reclasssed <- classify(sst_cropped_masked,reclass_matrix)
+
+class(sst_reclasssed)
+```
+
+```{r}
+plot(sst_reclasssed)
+plot(sst_reclasssed,col = c("blue","red"),
+     plg = list(legend = c("Cooler","Warmer")))
+```
+
+```{r}
+sst_reclassed_df <- as.data.frame(sst_reclasssed, xy = TRUE, na.rm = FALSE)
+
+glimpse(sst_reclassed_df)
+
+ggplot() +
+  geom_raster(data = sst_reclassed_df, aes(x = x, y = y, fill = factor(CRW_SST_2))) +
+  scale_fill_manual(
+    values = c("blue", "red"),
+    labels =  c("Cooler","Warmer"),
+    name = "SST Class",
+    na.value = "white"
+  ) +
+  coord_equal() +
+  labs(title = "Sea Surface Temperature with GBR Boundary",
+       x = "Longitude",
+    y = "Latitude")+
+  theme_minimal()
+
+```
+
+### Raster Math
+
+```{r}
+sst_cropped_masked* 2
+# all raster values are multiplied by 2
+
+# convert temp to Frahenheit
+sst_F <- (sst_cropped_masked*1.8)+ 2
+plot(sst_F)
+```
+
+### Projecting Rasters
+
+```{r}
+zones <- vect("terra/gbr_habitat_protection_zones.gpkg")
+```
+
+```{r}
+zones
+zones_sf <- st_as_sf(zones)
+glimpse(zones_sf)
+```
+
+```{r}
+
+ggplot() +
+  geom_raster(data = sst_df, aes(x = x, y = y, fill = CRW_SST_2)) +
+  geom_sf(data = zones_sf, fill = NA, color = "red",linewidth = 1) +
+  scale_fill_viridis_c(name = "SST (°C)") +
+  coord_sf() +
+  theme_minimal() +
+  labs(title = "Sea Surface Temperature with GBR Boundary")
+```
+
+```{r}
+plot(sst)
+lines(zones)
+```
+
+```{r}
+crs(zones)
+crs(zones,describe = TRUE)
+```
+
+```{r}
+sst_cropped_masked_projected <- project(sst_cropped_masked, crs(zones))
+```
+
+```{r}
+sst_cropped_masked_projected
+
+sst_cropped_masked_projected_df <- as.data.frame(sst_cropped_masked_projected,xy = TRUE, na.rm = FALSE)
+
+```
+
+```{r}
+ggplot() +
+  geom_raster(data = sst_cropped_masked_projected_df, aes(x = x, y = y, fill = CRW_SST_2)) +
+  geom_sf(data = zones_sf, fill = NA, color = "red",linewidth = 1) +
+  scale_fill_viridis_c(name = "SST (°C)",na.value = "white") +
+  coord_sf() +
+  theme_minimal() +
+  labs(title = "Sea Surface Temperature with GBR Boundary")
+```
+
+```{r}
+summary(sst_cropped_masked)
+summary(sst_cropped_masked_projected)
+```
+
+```{r}
+ncell(sst_cropped_masked)
+ncell(sst_cropped_masked_projected)
+```
+
+```{r}
+sst_cropped_masked_projected
+sst_cropped_masked
+```
+
+### Raster Layers
+
+```{r}
+sst_monthly <- rast("terra/gbr_monthly_temp.tif")
+```
+
+```{r}
+sst_monthly
+```
+
+```{r}
+plot(sst_monthly)
+```
+
+```{r}
+plot(sst_monthly[[32:36]])
+```
+
+```{r}
+sst_monthly_cropped_masked <- crop(sst_monthly,gbr_boundary,mask = TRUE)
+
+sst_monthly_cropped_masked_df <- as.data.frame(sst_monthly_cropped_masked, xy = TRUE, na.rm = FALSE)
+```
+
+```{r}
+plot(sst_monthly_cropped_masked)
+
+```
+
+```{r}
+ggplot() +
+  geom_raster(data = sst_monthly_cropped_masked_df, aes(x = x, y = y)) +
+  geom_sf(data = gbr_boundary_sf, fill = NA, color = "black", linewidth = 1) +
+  scale_fill_viridis_c(name = "SST (°C)",na.value = "white") +
+ coord_sf() +
+  theme_minimal() +
+  labs(title = "Sea Surface Temperature with GBR Boundary",
+       x = "Longitude",
+    y = "Latitude")
+```
+
+```{r}
+glimpse(sst_monthly_cropped_masked_df)
+sst_monthly
+```
+
+```{r}
+sst_long <- sst_monthly_cropped_masked_df |> 
+  pivot_longer( cols = starts_with("ym_"),
+                 values_to = "SST",
+               names_to = "month",
+              )
+```
+
+```{r}
+ggplot(data = sst_long,aes(x = x, y = y, fill = SST))+
+  geom_raster()+
+  coord_fixed()+
+  scale_fill_viridis_c(name = "SST (°C)", na.value = "white") +
+  facet_wrap(~month, ncol = 6) +
+  theme_minimal() +
+  theme(
+    axis.text = element_blank(),
+    axis.title = element_blank(),
+    panel.grid = element_blank(),
+    strip.text = element_text(size = 10),
+    legend.position = "bottom"
+  )
+```
+
+```{r}
+plot(sst_monthly_cropped_masked[[1:4]],fun = function(x)lines(gbr_boundary))
+lines(gbr_boundary)
+```
+
+```{r}
+plet(sst_monthly_cropped_masked[[1]])
+```
